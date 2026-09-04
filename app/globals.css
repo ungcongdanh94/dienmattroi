@@ -4,6 +4,8 @@
 
 body {
   font-family: var(--font-body), system-ui, sans-serif;
+  color: #17212B;
+  background: #F5F7F9;
 }
 
 h1, h2, h3, .font-display {
@@ -11,6 +13,10 @@ h1, h2, h3, .font-display {
 }
 
 ::selection {
-  background: #E8A33D;
-  color: #14324A;
+  background: #F4B63F;
+  color: #0B2239;
+}
+
+html {
+  scroll-behavior: smooth;
 }

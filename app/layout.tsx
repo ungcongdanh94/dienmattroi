@@ -15,8 +15,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Máy tính công suất điện mặt trời — Công Thảnh",
-  description: "Ước tính công suất hệ thống điện mặt trời on-grid / off-grid / hybrid",
+  title: "Công Thảnh — Giải pháp điện mặt trời",
+  description: "Giải pháp điện mặt trời và lưu trữ năng lượng cho gia đình, doanh nghiệp, nhà xưởng.",
 };
 
 export default function RootLayout({
