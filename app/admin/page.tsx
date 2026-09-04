@@ -305,6 +305,8 @@ export default function AdminPage() {
             <PriceField label="Khung/giá đỡ — Giá đỡ nghiêng (đ/kWp)" value={catalog.otherPricing.framePerKwpGiaDoNghieng} onChange={(v) => updateOtherPricing("framePerKwpGiaDoNghieng", v)} />
             <PriceField label="Cáp DC (đ/mét)" value={catalog.otherPricing.dcCablePerMeter} onChange={(v) => updateOtherPricing("dcCablePerMeter", v)} />
             <PriceField label="Cáp AC (đ/mét)" value={catalog.otherPricing.acCablePerMeter} onChange={(v) => updateOtherPricing("acCablePerMeter", v)} />
+            <RateField label="Mét cáp DC / kWp (mức phổ biến, để tự tính số mét)" value={catalog.otherPricing.dcCableMetersPerKwp} onChange={(v) => updateOtherPricing("dcCableMetersPerKwp", v)} />
+            <RateField label="Mét cáp AC / kWp (mức phổ biến, để tự tính số mét)" value={catalog.otherPricing.acCableMetersPerKwp} onChange={(v) => updateOtherPricing("acCableMetersPerKwp", v)} />
             <PriceField label="Tủ điện AC/DC (đ/hệ)" value={catalog.otherPricing.acDcCabinetPrice} onChange={(v) => updateOtherPricing("acDcCabinetPrice", v)} />
             <PriceField label="Nhân công (đ/kWp)" value={catalog.otherPricing.laborPerKwp} onChange={(v) => updateOtherPricing("laborPerKwp", v)} />
             <PriceField label="Vận chuyển (đ/chuyến)" value={catalog.otherPricing.shippingPerTrip} onChange={(v) => updateOtherPricing("shippingPerTrip", v)} />
@@ -407,6 +409,22 @@ export default function AdminPage() {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function RateField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <div>
+      <label className="block text-xs text-ink/55">{label}</label>
+      <input
+        type="number"
+        min={0}
+        step={0.1}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value) || 0)}
+        className="mt-1.5 w-full rounded-lg border border-line px-3 py-2 text-right font-mono text-sm"
+      />
     </div>
   );
 }

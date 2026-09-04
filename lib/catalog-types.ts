@@ -33,6 +33,10 @@ export interface OtherPricing {
   dcCablePerMeter: number;
   /** đ/mét cáp AC */
   acCablePerMeter: number;
+  /** mét cáp DC / kWp — dùng để tự tính số mét cần, theo mức phổ biến */
+  dcCableMetersPerKwp: number;
+  /** mét cáp AC / kWp — dùng để tự tính số mét cần, theo mức phổ biến */
+  acCableMetersPerKwp: number;
   /** đ/hệ tủ điện AC/DC */
   acDcCabinetPrice: number;
   /** đ/kWp nhân công lắp đặt */

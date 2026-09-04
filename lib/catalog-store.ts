@@ -42,6 +42,8 @@ const DEFAULT_CATALOG: EquipmentCatalog = {
     framePerKwpGiaDoNghieng: 0,
     dcCablePerMeter: 0,
     acCablePerMeter: 0,
+    dcCableMetersPerKwp: 3,
+    acCableMetersPerKwp: 1.5,
     acDcCabinetPrice: 0,
     laborPerKwp: 0,
     shippingPerTrip: 0,
