@@ -264,451 +264,564 @@ export default function SolarCalculator() {
   }
 
   return (
-    <div ref={reportRef} className="mx-auto w-full max-w-5xl bg-[#F7F8FA] p-6 text-[#1F2933]">
-      <header className="mb-6 border-b border-[#1F2933]/10 pb-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="min-h-screen bg-surface font-body text-ink">
+      <div ref={reportRef} className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Header */}
+        <header className="mb-8 flex flex-wrap items-start justify-between gap-4 border-b border-line pb-6">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-[#F5A623]">Công Thảnh · Báo giá điện mặt trời</p>
-            <h1 className="mt-1 text-2xl font-bold text-[#1B3A4B]">Máy tính & báo giá hệ thống</h1>
+            <div className="text-sm font-medium text-navy/70">Công Thảnh</div>
+            <h1 className="font-display mt-1 text-[28px] font-semibold leading-tight text-navy sm:text-3xl">
+              Máy tính &amp; báo giá điện mặt trời
+            </h1>
           </div>
-          <div className="rounded-md bg-[#1B3A4B] px-3 py-1.5 text-xs font-mono text-white">#{quoteCode}</div>
-        </div>
-      </header>
-
-      <div className="mb-6 grid grid-cols-1 gap-4 rounded-lg border border-[#1F2933]/10 bg-white p-5 md:grid-cols-2">
-        <TextField label="Tên khách hàng" value={customerName} onChange={setCustomerName} placeholder="Anh/Chị Khách Hàng" />
-        <TextField label="SĐT khách" value={customerPhone} onChange={setCustomerPhone} placeholder="09xx xxx xxx" />
-        <TextField label="Địa danh công trình" value={siteAddress} onChange={setSiteAddress} placeholder="VD: Long Xuyên, An Giang" />
-        <div className="grid grid-cols-2 gap-4">
-          <TextField label="Tên sale" value={saleName} onChange={setSaleName} placeholder="Tên bạn" />
-          <TextField label="SĐT sale" value={salePhone} onChange={setSalePhone} placeholder="09xx xxx xxx" />
-        </div>
-      </div>
-
-      <div className="mb-6 grid grid-cols-3 gap-2">
-        {(Object.keys(SYSTEM_LABEL) as SystemType[]).map((key) => {
-          const active = systemType === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setSystemType(key)}
-              className={["rounded-lg border px-3 py-3 text-left transition-colors", active ? "border-[#F5A623] bg-[#1B3A4B] text-white" : "border-[#1F2933]/15 bg-white text-[#1F2933] hover:border-[#F5A623]/60"].join(" ")}
-            >
-              <div className="text-sm font-semibold">{SYSTEM_LABEL[key].title}</div>
-              <div className={["mt-0.5 text-xs", active ? "text-white/70" : "text-[#1F2933]/60"].join(" ")}>{SYSTEM_LABEL[key].desc}</div>
-            </button>
-          );
-        })}
-      </div>
-
-      {result.recommendation.suggestedType && (
-        <div className={["mb-6 rounded-lg border-l-4 p-4 text-sm", result.recommendation.matchesSelection ? "border-[#2E8B57] bg-[#2E8B57]/10" : "border-[#F5A623] bg-[#F5A623]/10"].join(" ")}>
-          <div className="font-semibold">
-            {result.recommendation.matchesSelection ? "✓ Lựa chọn phù hợp" : `⚠ Gợi ý: nên xem xét ${SYSTEM_LABEL[result.recommendation.suggestedType].title}`}
+          <div className="rounded-md border border-line bg-white px-3 py-1.5 font-mono text-xs text-ink/60">
+            #{quoteCode}
           </div>
-          <p className="mt-1 text-[#1F2933]/80">{result.recommendation.message}</p>
-        </div>
-      )}
+        </header>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <div className="rounded-lg border border-[#1F2933]/10 bg-white p-5">
-          <label className="block text-sm font-medium">Loại khách hàng điện</label>
-          <p className="mt-0.5 text-xs text-[#1F2933]/50">
-            Sinh hoạt (1 pha/3 pha) dùng chung 1 biểu giá bậc thang. Sản xuất/Kinh doanh tính theo cấp điện áp + khung giờ.
-          </p>
-          <select
-            value={customerType}
-            onChange={(e) => {
-              setCustomerType(e.target.value as CustomerType);
-              setVoltageIndex(0);
-            }}
-            className="mt-2 w-full rounded-md border border-[#1F2933]/20 px-3 py-2"
-          >
-            <option value="sinh_hoat">Sinh hoạt (hộ gia đình, 1 pha/3 pha)</option>
-            <option value="san_xuat">Sản xuất (nhà xưởng, nhà máy)</option>
-            <option value="kinh_doanh">Kinh doanh (cửa hàng, dịch vụ)</option>
-          </select>
-
-          {customerType !== "sinh_hoat" && (
-            <div className="mt-4 space-y-4 rounded-md bg-[#F7F8FA] p-4">
-              <div>
-                <label className="block text-sm font-medium">Cấp điện áp đấu nối</label>
-                <select value={voltageIndex} onChange={(e) => setVoltageIndex(Number(e.target.value))} className="mt-2 w-full rounded-md border border-[#1F2933]/20 px-3 py-2">
-                  {voltageList.map((v, i) => (
-                    <option key={v.voltageLabel} value={i}>
-                      {v.voltageLabel}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <SliderField label={`% giờ cao điểm: ${peakPercent}%`} value={peakPercent} min={0} max={100 - offPeakPercent} onChange={setPeakPercent} accent="#F5A623" />
-              <SliderField label={`% giờ thấp điểm: ${offPeakPercent}%`} value={offPeakPercent} min={0} max={100 - peakPercent} onChange={setOffPeakPercent} accent="#2E8B57" />
+        {/* Customer & sale info */}
+        <section className="mb-8 rounded-2xl border border-line bg-white p-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Tên khách hàng" value={customerName} onChange={setCustomerName} placeholder="Anh/Chị Khách Hàng" />
+            <Field label="Số điện thoại khách" value={customerPhone} onChange={setCustomerPhone} placeholder="09xx xxx xxx" />
+            <Field label="Địa chỉ công trình" value={siteAddress} onChange={setSiteAddress} placeholder="Long Xuyên, An Giang" />
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Tên nhân viên sale" value={saleName} onChange={setSaleName} placeholder="Tên bạn" />
+              <Field label="SĐT sale" value={salePhone} onChange={setSalePhone} placeholder="09xx xxx xxx" />
             </div>
-          )}
-
-          <div className="mt-5 flex items-center justify-between">
-            <label className="block text-sm font-medium">Nhập theo</label>
-            <button type="button" onClick={refreshTariff} disabled={tariffStatus === "loading"} className="text-xs font-medium text-[#1B3A4B] underline-offset-2 hover:underline disabled:opacity-50">
-              {tariffStatus === "loading" ? "Đang cập nhật…" : "↻ Cập nhật bảng giá EVN"}
-            </button>
           </div>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <ToggleButton active={inputMode === "bill"} onClick={() => setInputMode("bill")} label="Tiền điện (VNĐ)" />
-            <ToggleButton active={inputMode === "kwh"} onClick={() => setInputMode("kwh")} label="Số kWh" />
-          </div>
+        </section>
 
-          {inputMode === "bill" ? (
-            <>
-              <label className="mt-4 block text-sm font-medium">Số tiền hoá đơn trung bình / tháng (VNĐ, đã gồm VAT)</label>
-              <input type="number" min={0} step={1000} value={monthlyBillVnd} onChange={(e) => setMonthlyBillVnd(Number(e.target.value) || 0)} className="mt-2 w-full rounded-md border border-[#1F2933]/20 px-3 py-2 font-mono text-lg" />
-              <p className="mt-1 text-xs text-[#1F2933]/50">
-                ≈ <span className="font-mono">{monthlyKwh}</span> kWh/tháng · hiệu lực từ {tariff.effectiveFrom}
-              </p>
-            </>
-          ) : (
-            <>
-              <label className="mt-4 block text-sm font-medium">Sản lượng tiêu thụ trung bình / tháng (kWh)</label>
-              <input type="number" min={0} value={monthlyKwhRaw} onChange={(e) => setMonthlyKwhRaw(Number(e.target.value) || 0)} className="mt-2 w-full rounded-md border border-[#1F2933]/20 px-3 py-2 font-mono text-lg" />
-              <p className="mt-1 text-xs text-[#1F2933]/50">≈ <span className="font-mono">{vnd(estimatedBillVnd)}</span>/tháng</p>
-            </>
-          )}
-
-          <SliderField
-            label={`Tỷ lệ dùng điện ban ngày: ${dayUsagePercent}% (đêm: ${100 - dayUsagePercent}%)`}
-            value={dayUsagePercent}
-            min={0}
-            max={100}
-            onChange={setDayUsagePercent}
-            accent="#F5A623"
-            className="mt-5"
-          />
-
-          {systemType !== "off_grid" && (
-            <SliderField label={`Mức bù hoá đơn mong muốn: ${offsetPercent}%`} value={offsetPercent} min={20} max={100} onChange={setOffsetPercent} accent="#F5A623" className="mt-5" />
-          )}
-
-          {systemType !== "on_grid" && (
-            <div className="mt-5 space-y-4 rounded-md bg-[#F7F8FA] p-4">
-              <div>
-                <label className="block text-sm font-medium">Loại pin lưu trữ</label>
-                <select value={batteryType} onChange={(e) => setBatteryType(e.target.value as BatteryType)} className="mt-2 w-full rounded-md border border-[#1F2933]/20 px-3 py-2">
-                  <option value="lithium">Lithium (DoD 90%)</option>
-                  <option value="acid">Acid / chì (DoD 50%)</option>
-                </select>
-              </div>
-              {systemType === "off_grid" && (
-                <SliderField label={`Số ngày tự trị: ${autonomyDays} ngày`} value={autonomyDays} min={0.5} max={3} step={0.5} onChange={setAutonomyDays} accent="#2E8B57" />
-              )}
-              {systemType === "hybrid" && (
-                <>
-                  <SliderField label={`Số giờ backup: ${backupHours} giờ`} value={backupHours} min={1} max={12} onChange={setBackupHours} accent="#2E8B57" />
-                  <SliderField label={`% tải ban đêm cần backup: ${backupLoadPercent}%`} value={backupLoadPercent} min={10} max={100} step={5} onChange={setBackupLoadPercent} accent="#2E8B57" />
-                </>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-lg border border-[#1B3A4B]/20 bg-[#1B3A4B] p-5 text-white">
-          <div className="text-xs uppercase tracking-[0.2em] text-white/50">Công suất hệ thống đề xuất</div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-mono text-5xl font-bold tabular-nums text-[#F5A623]">{result.pvSizeKwp}</span>
-            <span className="text-lg text-white/70">kWp</span>
-          </div>
-          <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-            <Stat label="Số tấm pin" value={`${result.panelCount} tấm`} />
-            <Stat label="Công suất Inverter" value={`${result.inverterSizeKw} kW`} />
-            <Stat label="Tiêu thụ / ngày" value={`${result.dailyKwh} kWh`} />
-            <Stat label="Tiêu thụ ban ngày" value={`${result.dayKwh} kWh`} />
-            <Stat label="Tiêu thụ ban đêm" value={`${result.nightKwh} kWh`} />
-            {result.batteryCapacityKwh !== null && <Stat label="Dung lượng pin" value={`${result.batteryCapacityKwh} kWh`} accent="#2E8B57" />}
-          </div>
-          <div className="mt-5 space-y-1.5 border-t border-white/15 pt-4">
-            {result.notes.map((note, i) => (
-              <p key={i} className="text-xs leading-relaxed text-white/60">· {note}</p>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-8">
-        <h2 className="text-lg font-bold text-[#1B3A4B]">Phương án thiết bị gợi ý</h2>
-        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-          <AdvisoryCard title="Điện áp / số pha" value={result.equipmentAdvisory.phase.recommended} reason={result.equipmentAdvisory.phase.reason} />
-          <AdvisoryCard title="Loại Inverter" value={result.equipmentAdvisory.inverterType.label} reason={result.equipmentAdvisory.inverterType.reason} />
-          <AdvisoryCard
-            title="Loại pin lưu trữ"
-            value={result.equipmentAdvisory.batteryChemistry.recommended === "lithium" ? "Lithium (LFP)" : result.equipmentAdvisory.batteryChemistry.recommended === "acid" ? "Acid / chì" : "Không cần pin"}
-            reason={result.equipmentAdvisory.batteryChemistry.reason}
-          />
-        </div>
-      </div>
-
-      <div className="mt-8">
-        <h2 className="text-lg font-bold text-[#1B3A4B]">Chọn combo thiết bị cho báo giá</h2>
-        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-          {(Object.keys(MOUNTING_FACTOR) as MountingType[]).map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setMountingType(key)}
-              className={["rounded-lg border px-3 py-2 text-left text-sm transition-colors", mountingType === key ? "border-[#F5A623] bg-[#1B3A4B] text-white" : "border-[#1F2933]/15 bg-white hover:border-[#F5A623]/60"].join(" ")}
-            >
-              <div className="font-semibold">{MOUNTING_FACTOR[key].label}</div>
-              <div className={mountingType === key ? "mt-0.5 text-xs text-white/70" : "mt-0.5 text-xs text-[#1F2933]/60"}>{MOUNTING_FACTOR[key].note}</div>
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
-          {comboResults.map((cr) => {
-            const active = cr.combo.id === selectedComboId;
+        {/* System type */}
+        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {(Object.keys(SYSTEM_LABEL) as SystemType[]).map((key) => {
+            const active = systemType === key;
             return (
               <button
-                key={cr.combo.id}
+                key={key}
                 type="button"
-                onClick={() => setSelectedComboId(cr.combo.id)}
-                className={["rounded-lg border p-4 text-left transition-colors", active ? "border-[#F5A623] ring-2 ring-[#F5A623]/40" : "border-[#1F2933]/10 hover:border-[#F5A623]/50", "bg-white"].join(" ")}
+                onClick={() => setSystemType(key)}
+                className={[
+                  "rounded-xl border px-4 py-3 text-left transition-colors",
+                  active ? "border-navy bg-navy text-white" : "border-line bg-white text-ink hover:border-navy/40",
+                ].join(" ")}
               >
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-[#1B3A4B]">{cr.combo.name}</div>
-                  {active && <span className="rounded-full bg-[#F5A623] px-2 py-0.5 text-[10px] font-semibold text-white">ĐANG CHỌN</span>}
-                </div>
-                <div className="text-xs text-[#1F2933]/50">
-                  {cr.combo.panelBrand} {cr.combo.panelWattage}W · {cr.combo.inverterBrand} · {cr.combo.batteryBrand}
-                </div>
-                <div className="mt-3 space-y-2 text-sm">
-                  <Row label={`Tấm pin (${cr.panelAreaM2} m²/tấm)`} value={`${cr.panelCount} tấm`} />
-                  <Row label="Diện tích mái cần lắp" value={`${cr.installedAreaM2} m²`} accent="#F5A623" />
-                  <Row label="Inverter" value={`${cr.inverterCapacityKw} kW`} />
-                  {cr.batteryModuleCount !== null && <Row label="Pin lưu trữ" value={`${cr.batteryModuleCount} module`} />}
+                <div className="font-display text-[15px] font-semibold">{SYSTEM_LABEL[key].title}</div>
+                <div className={["mt-0.5 text-[13px]", active ? "text-white/70" : "text-ink/55"].join(" ")}>
+                  {SYSTEM_LABEL[key].desc}
                 </div>
               </button>
             );
           })}
         </div>
-      </div>
 
-      <div className="mt-8">
-        <h2 className="text-lg font-bold text-[#1B3A4B]">Bảng kê vật tư & báo giá</h2>
-        <p className="mt-1 text-xs text-[#1F2933]/50">Nhập đơn giá từng hạng mục — số lượng đã tự tính theo công suất.</p>
-        <div className="mt-3 overflow-x-auto rounded-lg border border-[#1F2933]/10 bg-white">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[#1F2933]/10 bg-[#F7F8FA] text-left text-xs uppercase text-[#1F2933]/50">
-                <th className="px-3 py-2">Hạng mục</th>
-                <th className="px-3 py-2">Hãng</th>
-                <th className="px-3 py-2 text-right">SL</th>
-                <th className="px-3 py-2 text-right">Đơn giá (đ)</th>
-                <th className="px-3 py-2 text-right">Thành tiền</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((it) => (
-                <tr key={it.id} className="border-b border-[#1F2933]/5">
-                  <td className="px-3 py-2">{it.label}</td>
-                  <td className="px-3 py-2 text-[#1F2933]/60">{it.brandModel}</td>
-                  <td className="px-3 py-2 text-right font-mono">
-                    {it.id === "dc_cable" ? (
-                      <input type="number" min={0} value={dcCableM} onChange={(e) => setDcCableM(Number(e.target.value) || 0)} className="w-16 rounded border border-[#1F2933]/20 px-1 py-0.5 text-right font-mono" />
-                    ) : it.id === "ac_cable" ? (
-                      <input type="number" min={0} value={acCableM} onChange={(e) => setAcCableM(Number(e.target.value) || 0)} className="w-16 rounded border border-[#1F2933]/20 px-1 py-0.5 text-right font-mono" />
-                    ) : it.id === "shipping" ? (
-                      <input type="number" min={0} value={shippingTrips} onChange={(e) => setShippingTrips(Number(e.target.value) || 0)} className="w-16 rounded border border-[#1F2933]/20 px-1 py-0.5 text-right font-mono" />
-                    ) : (
-                      `${it.qty}${it.unit === "kWp" ? " kWp" : ""}`
-                    )}
-                    {it.id !== "dc_cable" && it.id !== "ac_cable" && it.id !== "shipping" ? "" : ` ${it.unit}`}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <input
-                      type="number"
-                      min={0}
-                      step={1000}
-                      value={it.unitPriceVnd || ""}
-                      placeholder="0"
-                      onChange={(e) => setUnitPrice(it.id, Number(e.target.value) || 0)}
-                      className="w-28 rounded border border-[#1F2933]/20 px-2 py-1 text-right font-mono"
-                    />
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono font-medium">{vnd(itemTotal(it))}</td>
-                </tr>
-              ))}
-              <tr className="border-t border-[#1F2933]/10">
-                <td colSpan={4} className="px-3 py-2 text-right font-medium">Tổng trước chiết khấu</td>
-                <td className="px-3 py-2 text-right font-mono font-semibold">{vnd(sub)}</td>
-              </tr>
-              <tr className="bg-[#F5A623]/10">
-                <td colSpan={3} className="px-3 py-2 text-right font-medium">Chiết khấu thương mại</td>
-                <td className="px-3 py-2 text-right">
-                  <input type="number" min={0} max={100} value={discountPercent} onChange={(e) => setDiscountPercent(Number(e.target.value) || 0)} className="w-16 rounded border border-[#1F2933]/20 px-2 py-1 text-right font-mono" />%
-                </td>
-                <td className="px-3 py-2 text-right font-mono">-{vnd(sub - totalPayment)}</td>
-              </tr>
-              <tr className="bg-[#2E8B57]/10">
-                <td colSpan={4} className="px-3 py-2 text-right text-base font-bold">TỔNG THANH TOÁN</td>
-                <td className="px-3 py-2 text-right font-mono text-base font-bold text-[#2E8B57]">{vnd(totalPayment)}</td>
-              </tr>
-            </tbody>
-          </table>
+        {result.recommendation.suggestedType && (
+          <div
+            className={[
+              "mb-8 rounded-xl border p-4 text-sm",
+              result.recommendation.matchesSelection ? "border-meter/30 bg-meter/[0.06]" : "border-sun/40 bg-sun/[0.08]",
+            ].join(" ")}
+          >
+            <div className="font-medium text-ink">
+              {result.recommendation.matchesSelection
+                ? "Lựa chọn phù hợp"
+                : `Đáng cân nhắc: ${SYSTEM_LABEL[result.recommendation.suggestedType].title}`}
+            </div>
+            <p className="mt-1 text-ink/70">{result.recommendation.message}</p>
+          </div>
+        )}
+
+        {/* Form + sticky meter */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
+          {/* Left: inputs */}
+          <div className="space-y-6 rounded-2xl border border-line bg-white p-6">
+            <div>
+              <h2 className="font-display text-[15px] font-semibold text-navy">Loại khách hàng điện</h2>
+              <p className="mt-1 text-[13px] text-ink/55">
+                Sinh hoạt (1 pha/3 pha) dùng chung 1 biểu giá bậc thang. Sản xuất/Kinh doanh tính theo cấp điện áp và khung giờ.
+              </p>
+              <select
+                value={customerType}
+                onChange={(e) => {
+                  setCustomerType(e.target.value as CustomerType);
+                  setVoltageIndex(0);
+                }}
+                className="mt-3 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
+              >
+                <option value="sinh_hoat">Sinh hoạt (hộ gia đình, 1 pha/3 pha)</option>
+                <option value="san_xuat">Sản xuất (nhà xưởng, nhà máy)</option>
+                <option value="kinh_doanh">Kinh doanh (cửa hàng, dịch vụ)</option>
+              </select>
+
+              {customerType !== "sinh_hoat" && (
+                <div className="mt-4 space-y-4 rounded-xl bg-surface p-4">
+                  <div>
+                    <Label>Cấp điện áp đấu nối</Label>
+                    <select
+                      value={voltageIndex}
+                      onChange={(e) => setVoltageIndex(Number(e.target.value))}
+                      className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
+                    >
+                      {voltageList.map((v, i) => (
+                        <option key={v.voltageLabel} value={i}>
+                          {v.voltageLabel}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <Slider label={`Giờ cao điểm: ${peakPercent}%`} value={peakPercent} min={0} max={100 - offPeakPercent} onChange={setPeakPercent} accent="#E8A33D" />
+                  <Slider label={`Giờ thấp điểm: ${offPeakPercent}%`} value={offPeakPercent} min={0} max={100 - peakPercent} onChange={setOffPeakPercent} accent="#2F8F5B" />
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-line pt-6">
+              <div className="flex items-center justify-between">
+                <h2 className="font-display text-[15px] font-semibold text-navy">Sản lượng tiêu thụ</h2>
+                <button
+                  type="button"
+                  onClick={refreshTariff}
+                  disabled={tariffStatus === "loading"}
+                  className="text-xs font-medium text-navy/70 underline-offset-2 hover:text-navy hover:underline disabled:opacity-50"
+                >
+                  {tariffStatus === "loading" ? "Đang cập nhật…" : "Cập nhật bảng giá EVN"}
+                </button>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <ToggleButton active={inputMode === "bill"} onClick={() => setInputMode("bill")} label="Tiền điện (VNĐ)" />
+                <ToggleButton active={inputMode === "kwh"} onClick={() => setInputMode("kwh")} label="Số kWh" />
+              </div>
+
+              {inputMode === "bill" ? (
+                <>
+                  <Label className="mt-4">Hoá đơn trung bình / tháng (đã gồm VAT)</Label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1000}
+                    value={monthlyBillVnd}
+                    onChange={(e) => setMonthlyBillVnd(Number(e.target.value) || 0)}
+                    className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 font-mono text-lg focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
+                  />
+                  <p className="mt-1.5 text-[13px] text-ink/50">
+                    ≈ <span className="font-mono text-ink/70">{monthlyKwh}</span> kWh/tháng · biểu giá hiệu lực từ {tariff.effectiveFrom}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Label className="mt-4">Sản lượng trung bình / tháng</Label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={monthlyKwhRaw}
+                    onChange={(e) => setMonthlyKwhRaw(Number(e.target.value) || 0)}
+                    className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 font-mono text-lg focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
+                  />
+                  <p className="mt-1.5 text-[13px] text-ink/50">≈ <span className="font-mono text-ink/70">{vnd(estimatedBillVnd)}</span>/tháng</p>
+                </>
+              )}
+
+              <Slider
+                label={`Dùng ban ngày: ${dayUsagePercent}% · ban đêm ${100 - dayUsagePercent}%`}
+                value={dayUsagePercent}
+                min={0}
+                max={100}
+                onChange={setDayUsagePercent}
+                accent="#E8A33D"
+                className="mt-5"
+              />
+
+              {systemType !== "off_grid" && (
+                <Slider label={`Mức bù hoá đơn: ${offsetPercent}%`} value={offsetPercent} min={20} max={100} onChange={setOffsetPercent} accent="#E8A33D" className="mt-5" />
+              )}
+            </div>
+
+            {systemType !== "on_grid" && (
+              <div className="border-t border-line pt-6">
+                <h2 className="font-display text-[15px] font-semibold text-navy">Pin lưu trữ</h2>
+                <div className="mt-3 space-y-4 rounded-xl bg-surface p-4">
+                  <div>
+                    <Label>Loại pin</Label>
+                    <select
+                      value={batteryType}
+                      onChange={(e) => setBatteryType(e.target.value as BatteryType)}
+                      className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
+                    >
+                      <option value="lithium">Lithium (DoD 90%)</option>
+                      <option value="acid">Acid / chì (DoD 50%)</option>
+                    </select>
+                  </div>
+                  {systemType === "off_grid" && (
+                    <Slider label={`Số ngày tự trị: ${autonomyDays} ngày`} value={autonomyDays} min={0.5} max={3} step={0.5} onChange={setAutonomyDays} accent="#2F8F5B" />
+                  )}
+                  {systemType === "hybrid" && (
+                    <>
+                      <Slider label={`Số giờ backup: ${backupHours} giờ`} value={backupHours} min={1} max={12} onChange={setBackupHours} accent="#2F8F5B" />
+                      <Slider label={`Tải ban đêm cần backup: ${backupLoadPercent}%`} value={backupLoadPercent} min={10} max={100} step={5} onChange={setBackupLoadPercent} accent="#2F8F5B" />
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right: sticky meter readout */}
+          <div className="lg:sticky lg:top-6">
+            <div className="rounded-2xl bg-navy p-6 text-white">
+              <div className="text-[13px] text-white/55">Công suất hệ thống đề xuất</div>
+              <div className="mt-1.5 flex items-baseline gap-2">
+                <span className="font-mono text-[44px] font-semibold leading-none tabular-nums text-sun">{result.pvSizeKwp}</span>
+                <span className="text-base text-white/60">kWp</span>
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-2.5 text-sm">
+                <Readout label="Số tấm pin" value={`${result.panelCount} tấm`} />
+                <Readout label="Inverter" value={`${result.inverterSizeKw} kW`} />
+                <Readout label="Tiêu thụ/ngày" value={`${result.dailyKwh} kWh`} />
+                <Readout label="Ban ngày" value={`${result.dayKwh} kWh`} />
+                <Readout label="Ban đêm" value={`${result.nightKwh} kWh`} />
+                {result.batteryCapacityKwh !== null && <Readout label="Pin lưu trữ" value={`${result.batteryCapacityKwh} kWh`} accent="#2F8F5B" />}
+              </div>
+
+              <div className="mt-5 space-y-1.5 border-t border-white/10 pt-4">
+                {result.notes.map((note, i) => (
+                  <p key={i} className="text-[12.5px] leading-relaxed text-white/50">
+                    {note}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="mt-8">
-        <h2 className="text-lg font-bold text-[#1B3A4B]">Phân tích tài chính (ROI)</h2>
-        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <MetricCard label="Sản lượng bù/tháng" value={`${Math.round(monthlyKwh * (systemType === "off_grid" ? 1 : offsetPercent / 100))} kWh`} />
-          <MetricCard label="Tiết kiệm/tháng" value={vnd(savingsPerMonth)} accent="#2E8B57" />
-          <MetricCard label="Tổng đầu tư" value={vnd(totalPayment)} />
-          <MetricCard label="Hoàn vốn (không vay)" value={paybackYears === Infinity ? "—" : `${paybackYears} năm`} accent="#F5A623" />
-        </div>
-
-        <div className="mt-4 rounded-lg border border-[#F5A623]/30 bg-[#F5A623]/5 p-4">
-          <div className="text-sm font-semibold text-[#1B3A4B]">🏦 Phương án vay & hoàn vốn</div>
+        {/* Equipment advisory */}
+        <section className="mt-8">
+          <h2 className="font-display text-lg font-semibold text-navy">Phương án thiết bị gợi ý</h2>
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <NumberField label="Tỉ lệ vay (%)" value={loanPercent} onChange={setLoanPercent} />
-            <NumberField label="Lãi vay (%/năm)" value={interestRatePercent} onChange={setInterestRatePercent} />
-            <div className="rounded-md bg-white p-3 text-sm">
-              <div className="text-xs text-[#1F2933]/50">Hoàn vốn (có vay)</div>
-              <div className="mt-1 font-mono text-lg font-bold text-[#F5A623]">{loan.paybackWithLoanYears === Infinity ? "—" : `${loan.paybackWithLoanYears} năm`}</div>
-            </div>
+            <AdvisoryCard title="Điện áp / số pha" value={result.equipmentAdvisory.phase.recommended} reason={result.equipmentAdvisory.phase.reason} />
+            <AdvisoryCard title="Loại inverter" value={result.equipmentAdvisory.inverterType.label} reason={result.equipmentAdvisory.inverterType.reason} />
+            <AdvisoryCard
+              title="Loại pin lưu trữ"
+              value={
+                result.equipmentAdvisory.batteryChemistry.recommended === "lithium"
+                  ? "Lithium (LFP)"
+                  : result.equipmentAdvisory.batteryChemistry.recommended === "acid"
+                    ? "Acid / chì"
+                    : "Không cần pin"
+              }
+              reason={result.equipmentAdvisory.batteryChemistry.reason}
+            />
           </div>
-          <p className="mt-3 text-xs text-[#1F2933]/60">
-            Vốn tự có {vnd(loan.ownCapitalVnd)} · Vay {vnd(loan.loanAmountVnd)} · Lãi năm 1 {vnd(loan.year1InterestVnd)} · Net năm 1 {vnd(loan.netYear1Vnd)}
-          </p>
-          <p className="mt-1 text-xs text-[#1F2933]/40">Hoàn vốn = vốn tự có ÷ (tiết kiệm năm 1 − lãi vay năm 1). Ước tính đơn giản, chưa tính trả gốc dần theo lịch vay thực tế.</p>
-        </div>
+        </section>
 
-        <div className="mt-4 rounded-lg border border-[#1F2933]/10 bg-white">
-          <div className="border-b border-[#1F2933]/10 bg-[#1B3A4B] px-4 py-2 text-sm font-semibold text-white">Bảng khấu hao tài sản (đường thẳng)</div>
-          <div className="flex items-center justify-end gap-2 px-4 pt-3 text-xs">
-            <span>Số năm khấu hao</span>
-            <input type="number" min={1} max={30} value={depreciationYears} onChange={(e) => setDepreciationYears(Number(e.target.value) || 1)} className="w-14 rounded border border-[#1F2933]/20 px-2 py-1 text-right font-mono" />
+        {/* Combo selection */}
+        <section className="mt-8">
+          <h2 className="font-display text-lg font-semibold text-navy">Chọn combo thiết bị</h2>
+          <p className="mt-1 text-[13px] text-ink/55">2 lựa chọn để khách hàng so sánh — diện tích tính theo kích thước tấm pin thật.</p>
+
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {(Object.keys(MOUNTING_FACTOR) as MountingType[]).map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setMountingType(key)}
+                className={[
+                  "rounded-xl border px-4 py-2.5 text-left text-sm transition-colors",
+                  mountingType === key ? "border-navy bg-navy text-white" : "border-line bg-white text-ink hover:border-navy/40",
+                ].join(" ")}
+              >
+                <div className="font-medium">{MOUNTING_FACTOR[key].label}</div>
+                <div className={mountingType === key ? "mt-0.5 text-xs text-white/65" : "mt-0.5 text-xs text-ink/50"}>{MOUNTING_FACTOR[key].note}</div>
+              </button>
+            ))}
           </div>
-          <table className="mt-2 w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs uppercase text-[#1F2933]/50">
-                <th className="px-4 py-2">Hạng mục</th>
-                <th className="px-4 py-2 text-right">Nguyên giá</th>
-                <th className="px-4 py-2 text-right">KH/năm</th>
-                <th className="px-4 py-2 text-right">KH/tháng</th>
-              </tr>
-            </thead>
-            <tbody>
-              {depreciationRows.map((r) => (
-                <tr key={r.label} className="border-t border-[#1F2933]/5">
-                  <td className="px-4 py-2">{r.label}</td>
-                  <td className="px-4 py-2 text-right font-mono">{vnd(r.originalValueVnd)}</td>
-                  <td className="px-4 py-2 text-right font-mono">{vnd(r.perYearVnd)}</td>
-                  <td className="px-4 py-2 text-right font-mono">{vnd(r.perMonthVnd)}</td>
+
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {comboResults.map((cr) => {
+              const active = cr.combo.id === selectedComboId;
+              return (
+                <button
+                  key={cr.combo.id}
+                  type="button"
+                  onClick={() => setSelectedComboId(cr.combo.id)}
+                  className={[
+                    "rounded-2xl border bg-white p-5 text-left transition-colors",
+                    active ? "border-navy ring-1 ring-navy" : "border-line hover:border-navy/40",
+                  ].join(" ")}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="font-display font-semibold text-navy">{cr.combo.name}</div>
+                    {active && <span className="rounded-md bg-sun px-2 py-0.5 text-[11px] font-medium text-navy">Đang chọn</span>}
+                  </div>
+                  <div className="text-[13px] text-ink/50">
+                    {cr.combo.panelBrand} {cr.combo.panelWattage}W · {cr.combo.inverterBrand} · {cr.combo.batteryBrand}
+                  </div>
+                  <div className="mt-3 space-y-2 text-sm">
+                    <Row label={`Tấm pin (${cr.panelAreaM2} m²/tấm)`} value={`${cr.panelCount} tấm`} />
+                    <Row label="Diện tích mái cần lắp" value={`${cr.installedAreaM2} m²`} accent="#E8A33D" />
+                    <Row label="Inverter" value={`${cr.inverterCapacityKw} kW`} />
+                    {cr.batteryModuleCount !== null && <Row label="Pin lưu trữ" value={`${cr.batteryModuleCount} module`} />}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Quote table */}
+        <section className="mt-8">
+          <h2 className="font-display text-lg font-semibold text-navy">Bảng kê vật tư &amp; báo giá</h2>
+          <p className="mt-1 text-[13px] text-ink/55">Nhập đơn giá từng hạng mục — số lượng đã tự tính theo công suất.</p>
+          <div className="mt-3 overflow-x-auto rounded-2xl border border-line bg-white">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line text-left text-[13px] text-ink/50">
+                  <th className="px-4 py-3 font-medium">Hạng mục</th>
+                  <th className="px-4 py-3 font-medium">Hãng</th>
+                  <th className="px-4 py-3 text-right font-medium">Số lượng</th>
+                  <th className="px-4 py-3 text-right font-medium">Đơn giá</th>
+                  <th className="px-4 py-3 text-right font-medium">Thành tiền</th>
                 </tr>
-              ))}
-              <tr className="border-t border-[#1F2933]/10 font-semibold">
-                <td className="px-4 py-2" colSpan={2}>Tổng khấu hao/năm</td>
-                <td className="px-4 py-2 text-right font-mono">{vnd(totalDepreciationPerYear)}</td>
-                <td className="px-4 py-2 text-right font-mono">{vnd(totalDepreciationPerMonth)}</td>
-              </tr>
-            </tbody>
-          </table>
-          <p className="px-4 pb-3 text-xs text-[#1F2933]/40">Khấu hao đường thẳng, giá trị thanh lý = 0. Chỉ tham khảo kế toán nội bộ.</p>
-        </div>
+              </thead>
+              <tbody>
+                {items.map((it) => (
+                  <tr key={it.id} className="border-b border-line/70 last:border-0">
+                    <td className="px-4 py-3">{it.label}</td>
+                    <td className="px-4 py-3 text-ink/55">{it.brandModel}</td>
+                    <td className="px-4 py-3 text-right font-mono">
+                      {it.id === "dc_cable" ? (
+                        <input type="number" min={0} value={dcCableM} onChange={(e) => setDcCableM(Number(e.target.value) || 0)} className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono" />
+                      ) : it.id === "ac_cable" ? (
+                        <input type="number" min={0} value={acCableM} onChange={(e) => setAcCableM(Number(e.target.value) || 0)} className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono" />
+                      ) : it.id === "shipping" ? (
+                        <input type="number" min={0} value={shippingTrips} onChange={(e) => setShippingTrips(Number(e.target.value) || 0)} className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono" />
+                      ) : (
+                        `${it.qty}${it.unit === "kWp" ? " kWp" : ""}`
+                      )}
+                      {it.id !== "dc_cable" && it.id !== "ac_cable" && it.id !== "shipping" ? "" : ` ${it.unit}`}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <input
+                        type="number"
+                        min={0}
+                        step={1000}
+                        value={it.unitPriceVnd || ""}
+                        placeholder="0"
+                        onChange={(e) => setUnitPrice(it.id, Number(e.target.value) || 0)}
+                        className="w-28 rounded-md border border-line px-2.5 py-1.5 text-right font-mono"
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono font-medium">{vnd(itemTotal(it))}</td>
+                  </tr>
+                ))}
+                <tr className="border-t border-line">
+                  <td colSpan={4} className="px-4 py-3 text-right text-ink/70">Tổng trước chiết khấu</td>
+                  <td className="px-4 py-3 text-right font-mono font-medium">{vnd(sub)}</td>
+                </tr>
+                <tr className="bg-sun/[0.06]">
+                  <td colSpan={3} className="px-4 py-3 text-right text-ink/70">Chiết khấu thương mại</td>
+                  <td className="px-4 py-3 text-right">
+                    <input type="number" min={0} max={100} value={discountPercent} onChange={(e) => setDiscountPercent(Number(e.target.value) || 0)} className="w-16 rounded-md border border-line px-2.5 py-1.5 text-right font-mono" />%
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono">-{vnd(sub - totalPayment)}</td>
+                </tr>
+                <tr className="bg-meter/[0.08]">
+                  <td colSpan={4} className="px-4 py-3 text-right text-[15px] font-semibold text-navy">Tổng thanh toán</td>
+                  <td className="px-4 py-3 text-right font-mono text-[15px] font-semibold text-meter">{vnd(totalPayment)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-        <div className="mt-4 rounded-lg border border-[#1F2933]/10 bg-white p-4">
-          <div className="text-sm font-semibold text-[#1B3A4B]">% IRR — So sánh đầu tư</div>
+        {/* Financial analysis */}
+        <section className="mt-8">
+          <h2 className="font-display text-lg font-semibold text-navy">Phân tích tài chính</h2>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-md bg-[#F7F8FA] p-3">
-              <div className="text-xs text-[#1F2933]/50">IRR dự án (25 năm)</div>
-              <div className="mt-1 font-mono text-lg font-bold text-[#1B3A4B]">{irr === null ? "—" : `${irr}%/năm`}</div>
-            </div>
-            <NumberField label="Lãi vay NH (%/năm)" value={interestRatePercent} onChange={setInterestRatePercent} />
-            <NumberField label="Gửi TK (%/năm)" value={bankSavingsRatePercent} onChange={setBankSavingsRatePercent} />
-            <div className="rounded-md bg-[#F7F8FA] p-3">
-              <div className="text-xs text-[#1F2933]/50">Kết luận</div>
-              <div className="mt-1 text-sm font-bold text-[#2E8B57]">{irrConclusion}</div>
-            </div>
+            <MetricCard label="Sản lượng bù/tháng" value={`${Math.round(monthlyKwh * (systemType === "off_grid" ? 1 : offsetPercent / 100))} kWh`} />
+            <MetricCard label="Tiết kiệm/tháng" value={vnd(savingsPerMonth)} accent="#2F8F5B" />
+            <MetricCard label="Tổng đầu tư" value={vnd(totalPayment)} />
+            <MetricCard label="Hoàn vốn" value={paybackYears === Infinity ? "—" : `${paybackYears} năm`} accent="#E8A33D" />
           </div>
-          <p className="mt-2 text-xs text-[#1F2933]/40">Ước tính dựa trên dòng tiền tiết kiệm điện 25 năm, có tính lạm phát giá điện và suy hao tấm pin ~0,5%/năm.</p>
-        </div>
-      </div>
 
-      <div className="mt-8">
-        <h2 className="text-lg font-bold text-[#1B3A4B]">Giả lập giá điện 10 năm tới & CO₂</h2>
-        <div className="mt-3 rounded-lg border border-[#1F2933]/10 bg-white">
-          <div className="flex items-center justify-between border-b border-[#1F2933]/10 bg-[#1B3A4B] px-4 py-2">
-            <span className="text-sm font-semibold text-white">Bảng dự báo</span>
-            <div className="flex items-center gap-2 text-xs text-white">
-              <span>Lạm phát</span>
-              <input type="number" min={0} max={30} value={inflationPercent} onChange={(e) => setInflationPercent(Number(e.target.value) || 0)} className="w-14 rounded border-none px-2 py-1 text-right font-mono text-[#1F2933]" />
-              <span>%/năm</span>
+          <div className="mt-4 rounded-2xl border border-line bg-white p-5">
+            <div className="font-medium text-navy">Phương án vay &amp; hoàn vốn</div>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <NumberField label="Tỉ lệ vay (%)" value={loanPercent} onChange={setLoanPercent} />
+              <NumberField label="Lãi vay (%/năm)" value={interestRatePercent} onChange={setInterestRatePercent} />
+              <div className="rounded-xl bg-surface p-3">
+                <div className="text-xs text-ink/50">Hoàn vốn (có vay)</div>
+                <div className="mt-1 font-mono text-lg font-semibold text-sun">{loan.paybackWithLoanYears === Infinity ? "—" : `${loan.paybackWithLoanYears} năm`}</div>
+              </div>
             </div>
+            <p className="mt-3 text-[13px] text-ink/55">
+              Vốn tự có {vnd(loan.ownCapitalVnd)} · Vay {vnd(loan.loanAmountVnd)} · Lãi năm 1 {vnd(loan.year1InterestVnd)} · Net năm 1 {vnd(loan.netYear1Vnd)}
+            </p>
+            <p className="mt-1.5 text-xs text-ink/40">Hoàn vốn = vốn tự có ÷ (tiết kiệm năm 1 − lãi vay năm 1). Ước tính đơn giản, chưa tính trả gốc dần theo lịch vay thực tế.</p>
           </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs uppercase text-[#1F2933]/50">
-                <th className="px-4 py-2">Năm</th>
-                <th className="px-4 py-2 text-right">Giá TB (đ/kWh)</th>
-                <th className="px-4 py-2 text-right">Tiết kiệm/năm</th>
-                <th className="px-4 py-2 text-right">Luỹ kế</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projection10Y.map((r) => (
-                <tr key={r.year} className="border-t border-[#1F2933]/5">
-                  <td className="px-4 py-2">Năm {r.year}</td>
-                  <td className="px-4 py-2 text-right font-mono">{r.avgPriceVndPerKwh.toLocaleString("vi-VN")}</td>
-                  <td className="px-4 py-2 text-right font-mono text-[#2E8B57]">{vnd(r.savingsThisYearVnd)}</td>
-                  <td className="px-4 py-2 text-right font-mono font-semibold">{vnd(r.cumulativeSavingsVnd)}</td>
+
+          <div className="mt-4 rounded-2xl border border-line bg-white">
+            <div className="flex items-center justify-between border-b border-line px-5 py-3">
+              <div className="font-medium text-navy">Khấu hao tài sản (đường thẳng)</div>
+              <div className="flex items-center gap-2 text-xs text-ink/55">
+                <span>Số năm</span>
+                <input type="number" min={1} max={30} value={depreciationYears} onChange={(e) => setDepreciationYears(Number(e.target.value) || 1)} className="w-14 rounded-md border border-line px-2 py-1 text-right font-mono" />
+              </div>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[13px] text-ink/50">
+                  <th className="px-5 py-2.5 font-medium">Hạng mục</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Nguyên giá</th>
+                  <th className="px-5 py-2.5 text-right font-medium">KH/năm</th>
+                  <th className="px-5 py-2.5 text-right font-medium">KH/tháng</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {depreciationRows.map((r) => (
+                  <tr key={r.label} className="border-t border-line/70">
+                    <td className="px-5 py-2.5">{r.label}</td>
+                    <td className="px-5 py-2.5 text-right font-mono">{vnd(r.originalValueVnd)}</td>
+                    <td className="px-5 py-2.5 text-right font-mono">{vnd(r.perYearVnd)}</td>
+                    <td className="px-5 py-2.5 text-right font-mono">{vnd(r.perMonthVnd)}</td>
+                  </tr>
+                ))}
+                <tr className="border-t border-line font-medium">
+                  <td className="px-5 py-2.5" colSpan={2}>Tổng khấu hao/năm</td>
+                  <td className="px-5 py-2.5 text-right font-mono">{vnd(totalDepreciationPerYear)}</td>
+                  <td className="px-5 py-2.5 text-right font-mono">{vnd(totalDepreciationPerMonth)}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p className="px-5 pb-4 pt-2 text-xs text-ink/40">Khấu hao đường thẳng, giá trị thanh lý = 0. Chỉ tham khảo kế toán nội bộ.</p>
+          </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <MetricCard label="CO₂ / năm" value={`${carbon.co2TonPerYear} tấn`} accent="#2E8B57" />
-          <MetricCard label="CO₂ / 25 năm" value={`${carbon.co2Ton25Year} tấn`} accent="#2E8B57" />
-          <MetricCard label="Giá trị tín chỉ / năm" value={vnd(carbon.creditValuePerYearVnd)} />
-          <MetricCard label="Giá trị tín chỉ / 25 năm" value={vnd(carbon.creditValue25YearVnd)} />
-        </div>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <NumberField label="Giá tín chỉ carbon (USD/tCO₂)" value={carbonPriceUsd} onChange={setCarbonPriceUsd} />
-          <NumberField label="Tỷ giá (đ/USD)" value={usdVndRate} onChange={setUsdVndRate} />
-        </div>
-        <p className="mt-2 text-xs text-[#1F2933]/40">Tín chỉ thị trường tự nguyện (VCM) — tham khảo, chưa phải cam kết đăng ký dự án. Hệ số lưới ≈ 0,661 kg CO₂/kWh.</p>
-      </div>
+          <div className="mt-4 rounded-2xl border border-line bg-white p-5">
+            <div className="font-medium text-navy">IRR — so sánh đầu tư</div>
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-xl bg-surface p-3">
+                <div className="text-xs text-ink/50">IRR dự án (25 năm)</div>
+                <div className="mt-1 font-mono text-lg font-semibold text-navy">{irr === null ? "—" : `${irr}%/năm`}</div>
+              </div>
+              <NumberField label="Lãi vay NH (%/năm)" value={interestRatePercent} onChange={setInterestRatePercent} />
+              <NumberField label="Gửi tiết kiệm (%/năm)" value={bankSavingsRatePercent} onChange={setBankSavingsRatePercent} />
+              <div className="rounded-xl bg-surface p-3">
+                <div className="text-xs text-ink/50">Kết luận</div>
+                <div className="mt-1 text-sm font-semibold text-meter">{irrConclusion}</div>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-ink/40">Ước tính dựa trên dòng tiền tiết kiệm điện 25 năm, có tính lạm phát giá điện và suy hao tấm pin ~0,5%/năm.</p>
+          </div>
+        </section>
 
-      <div className="mt-8 flex gap-3">
-        <button type="button" onClick={() => handleExport("png")} disabled={exporting !== null} className="flex-1 rounded-lg bg-[#2E8B57] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">
-          {exporting === "png" ? "Đang xuất…" : "🖼 Xuất PNG"}
-        </button>
-        <button type="button" onClick={() => handleExport("pdf")} disabled={exporting !== null} className="flex-1 rounded-lg bg-[#1B3A4B] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">
-          {exporting === "pdf" ? "Đang xuất…" : "📄 Xuất PDF"}
-        </button>
+        {/* 10-year projection & CO2 */}
+        <section className="mt-8">
+          <h2 className="font-display text-lg font-semibold text-navy">Giả lập giá điện 10 năm tới &amp; CO₂</h2>
+          <div className="mt-3 rounded-2xl border border-line bg-white">
+            <div className="flex items-center justify-between border-b border-line px-5 py-3">
+              <div className="font-medium text-navy">Dự báo tiết kiệm</div>
+              <div className="flex items-center gap-2 text-xs text-ink/55">
+                <span>Lạm phát</span>
+                <input type="number" min={0} max={30} value={inflationPercent} onChange={(e) => setInflationPercent(Number(e.target.value) || 0)} className="w-14 rounded-md border border-line px-2 py-1 text-right font-mono" />
+                <span>%/năm</span>
+              </div>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[13px] text-ink/50">
+                  <th className="px-5 py-2.5 font-medium">Năm</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Giá TB (đ/kWh)</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Tiết kiệm/năm</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Luỹ kế</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projection10Y.map((r) => (
+                  <tr key={r.year} className="border-t border-line/70">
+                    <td className="px-5 py-2.5">Năm {r.year}</td>
+                    <td className="px-5 py-2.5 text-right font-mono">{r.avgPriceVndPerKwh.toLocaleString("vi-VN")}</td>
+                    <td className="px-5 py-2.5 text-right font-mono text-meter">{vnd(r.savingsThisYearVnd)}</td>
+                    <td className="px-5 py-2.5 text-right font-mono font-medium">{vnd(r.cumulativeSavingsVnd)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <MetricCard label="CO₂ / năm" value={`${carbon.co2TonPerYear} tấn`} accent="#2F8F5B" />
+            <MetricCard label="CO₂ / 25 năm" value={`${carbon.co2Ton25Year} tấn`} accent="#2F8F5B" />
+            <MetricCard label="Giá trị tín chỉ / năm" value={vnd(carbon.creditValuePerYearVnd)} />
+            <MetricCard label="Giá trị tín chỉ / 25 năm" value={vnd(carbon.creditValue25YearVnd)} />
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <NumberField label="Giá tín chỉ carbon (USD/tCO₂)" value={carbonPriceUsd} onChange={setCarbonPriceUsd} />
+            <NumberField label="Tỷ giá (đ/USD)" value={usdVndRate} onChange={setUsdVndRate} />
+          </div>
+          <p className="mt-2 text-xs text-ink/40">Tín chỉ thị trường tự nguyện (VCM) — tham khảo, chưa phải cam kết đăng ký dự án. Hệ số lưới ≈ 0,661 kg CO₂/kWh.</p>
+        </section>
+
+        {/* Export */}
+        <div className="mt-8 flex gap-3">
+          <button
+            type="button"
+            onClick={() => handleExport("png")}
+            disabled={exporting !== null}
+            className="flex-1 rounded-xl bg-meter px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {exporting === "png" ? "Đang xuất…" : "Xuất PNG"}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExport("pdf")}
+            disabled={exporting !== null}
+            className="flex-1 rounded-xl bg-navy px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {exporting === "pdf" ? "Đang xuất…" : "Xuất PDF"}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function TextField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+// ---------- UI primitives ----------
+
+function Label({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <label className={`block text-sm font-medium text-ink ${className}`}>{children}</label>;
+}
+
+function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
     <div>
-      <label className="block text-sm font-medium">{label}</label>
-      <input type="text" value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className="mt-2 w-full rounded-md border border-[#1F2933]/20 px-3 py-2" />
+      <Label>{label}</Label>
+      <input
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
+      />
     </div>
   );
 }
 
 function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
-    <div className="rounded-md bg-white p-3 text-sm">
-      <label className="block text-xs text-[#1F2933]/50">{label}</label>
-      <input type="number" value={value} onChange={(e) => onChange(Number(e.target.value) || 0)} className="mt-1 w-full rounded border border-[#1F2933]/20 px-2 py-1 font-mono" />
+    <div className="rounded-xl bg-surface p-3">
+      <div className="text-xs text-ink/50">{label}</div>
+      <input
+        type="number"
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value) || 0)}
+        className="mt-1 w-full rounded-md border border-line bg-white px-2.5 py-1.5 font-mono focus:border-navy focus:outline-none"
+      />
     </div>
   );
 }
 
-function SliderField({
+function Slider({
   label,
   value,
   min,
@@ -729,7 +842,7 @@ function SliderField({
 }) {
   return (
     <div className={className}>
-      <label className="block text-sm font-medium">{label}</label>
+      <Label>{label}</Label>
       <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="mt-2 w-full" style={{ accentColor: accent }} />
     </div>
   );
@@ -737,7 +850,11 @@ function SliderField({
 
 function ToggleButton({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return (
-    <button type="button" onClick={onClick} className={["rounded-md border px-3 py-2 text-sm font-medium", active ? "border-[#F5A623] bg-[#1B3A4B] text-white" : "border-[#1F2933]/15 bg-white"].join(" ")}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={["rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors", active ? "border-navy bg-navy text-white" : "border-line bg-white text-ink hover:border-navy/40"].join(" ")}
+    >
       {label}
     </button>
   );
@@ -745,8 +862,8 @@ function ToggleButton({ active, onClick, label }: { active: boolean; onClick: ()
 
 function Row({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
-    <div className="flex justify-between border-b border-[#1F2933]/5 pb-2">
-      <span className="text-[#1F2933]/60">{label}</span>
+    <div className="flex justify-between border-b border-line/60 pb-2 last:border-0 last:pb-0">
+      <span className="text-ink/55">{label}</span>
       <span className="font-mono font-medium" style={accent ? { color: accent } : undefined}>
         {value}
       </span>
@@ -756,30 +873,30 @@ function Row({ label, value, accent }: { label: string; value: string; accent?: 
 
 function AdvisoryCard({ title, value, reason }: { title: string; value: string; reason: string }) {
   return (
-    <div className="rounded-lg border border-[#1F2933]/10 bg-white p-4">
-      <div className="text-xs uppercase tracking-wide text-[#1F2933]/50">{title}</div>
-      <div className="mt-1 text-base font-semibold text-[#1B3A4B]">{value}</div>
-      <p className="mt-2 text-xs leading-relaxed text-[#1F2933]/60">{reason}</p>
+    <div className="rounded-2xl border border-line bg-white p-4">
+      <div className="text-[13px] text-ink/50">{title}</div>
+      <div className="mt-1 font-display text-base font-semibold text-navy">{value}</div>
+      <p className="mt-2 text-[13px] leading-relaxed text-ink/55">{reason}</p>
     </div>
   );
 }
 
-function MetricCard({ label, value, accent = "#1B3A4B" }: { label: string; value: string; accent?: string }) {
+function MetricCard({ label, value, accent = "#14324A" }: { label: string; value: string; accent?: string }) {
   return (
-    <div className="rounded-lg border border-[#1F2933]/10 bg-white p-3">
-      <div className="text-xs text-[#1F2933]/50">{label}</div>
-      <div className="mt-1 font-mono text-base font-bold" style={{ color: accent }}>
+    <div className="rounded-xl border border-line bg-white p-3.5">
+      <div className="text-xs text-ink/50">{label}</div>
+      <div className="mt-1 font-mono text-[15px] font-semibold" style={{ color: accent }}>
         {value}
       </div>
     </div>
   );
 }
 
-function Stat({ label, value, accent = "#F5A623" }: { label: string; value: string; accent?: string }) {
+function Readout({ label, value, accent = "#E8A33D" }: { label: string; value: string; accent?: string }) {
   return (
-    <div className="rounded-md bg-white/5 p-3">
+    <div className="rounded-lg bg-white/[0.06] p-2.5">
       <div className="text-[11px] text-white/50">{label}</div>
-      <div className="mt-0.5 font-mono text-base font-semibold tabular-nums" style={{ color: accent }}>
+      <div className="mt-0.5 font-mono text-[15px] font-semibold tabular-nums" style={{ color: accent }}>
         {value}
       </div>
     </div>
