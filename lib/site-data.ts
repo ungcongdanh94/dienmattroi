@@ -43,9 +43,12 @@ export const PROCESS_STEPS = [
   { step: "04", title: "Bàn giao & giám sát", description: "Nghiệm thu, hướng dẫn vận hành và giám sát hiệu suất dài hạn." },
 ];
 
-/** ⚠️ Dữ liệu mẫu — thay bằng dự án thật của công ty */
+/** Ảnh thật do khách hàng/công ty cung cấp. Công suất là ƯỚC TÍNH từ số tấm pin
+ * nhìn thấy trong ảnh (không phải số liệu ghi nhận chính thức) — nên cập nhật lại
+ * chính xác khi có hồ sơ dự án. Địa điểm để chung "miền Tây Nam Bộ" vì chưa xác nhận
+ * huyện/tỉnh cụ thể. */
 export const PROJECTS = [
-  { id: 1, capacity: "8.2 kWp", type: "Hộ gia đình", location: "Long Xuyên, An Giang" },
-  { id: 2, capacity: "45 kWp", type: "Doanh nghiệp", location: "Châu Đốc, An Giang" },
-  { id: 3, capacity: "210 kWp", type: "Nhà xưởng", location: "Cần Thơ" },
+  { id: 1, capacity: "~6-7 kWp", type: "Hộ gia đình", location: "Miền Tây Nam Bộ", image: "/images/project-household.jpg" },
+  { id: 2, capacity: "~25-30 kWp", type: "Doanh nghiệp", location: "Miền Tây Nam Bộ", image: "/images/project-business.jpg" },
+  { id: 3, capacity: "~10-12 kWp", type: "Nhà xưởng", location: "Miền Tây Nam Bộ", image: "/images/project-factory.jpg" },
 ];

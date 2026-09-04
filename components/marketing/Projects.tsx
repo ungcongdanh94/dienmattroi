@@ -1,7 +1,5 @@
+import Image from "next/image";
 import { PROJECTS } from "@/lib/site-data";
-import PanelIllustration from "./PanelIllustration";
-
-const VARIANTS = ["household", "business", "factory"] as const;
 
 export default function Projects() {
   return (
@@ -10,10 +8,10 @@ export default function Projects() {
         <h2 className="font-display text-[28px] font-semibold text-navy sm:text-3xl">Dự án đã thực hiện</h2>
 
         <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-3">
-          {PROJECTS.map((p, i) => (
+          {PROJECTS.map((p) => (
             <div key={p.id} className="overflow-hidden rounded-card border border-line bg-white">
               <div className="relative aspect-[4/3] overflow-hidden">
-                <PanelIllustration variant={VARIANTS[i % VARIANTS.length]} />
+                <Image src={p.image} alt={`${p.type} — ${p.capacity}`} fill className="object-cover" />
               </div>
               <div className="p-5">
                 <div className="font-mono text-lg font-semibold text-navy">{p.capacity}</div>
