@@ -44,7 +44,11 @@ const DEFAULT_CATALOG: EquipmentCatalog = {
     acCablePerMeter: 0,
     dcCableMetersPerKwp: 3,
     acCableMetersPerKwp: 1.5,
-    acDcCabinetPrice: 0,
+    cabinetTiers: [
+      { id: "cab-1pha-3-12", phase: "1_pha", minKwp: 3, maxKwp: 12, priceVnd: 0 },
+      { id: "cab-3pha-8-20", phase: "3_pha", minKwp: 8, maxKwp: 20, priceVnd: 0 },
+      { id: "cab-3pha-25-50", phase: "3_pha", minKwp: 25, maxKwp: 50, priceVnd: 0 },
+    ],
     laborPerKwp: 0,
     shippingPerTrip: 0,
   },

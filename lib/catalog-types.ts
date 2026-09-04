@@ -24,6 +24,14 @@ export interface BatterySpec {
   priceVnd: number;
 }
 
+export interface CabinetPriceTier {
+  id: string;
+  phase: Phase;
+  minKwp: number;
+  maxKwp: number;
+  priceVnd: number;
+}
+
 export interface OtherPricing {
   /** đ/kWp — khung áp mái tôn/mái dốc */
   framePerKwpApMai: number;
@@ -37,8 +45,8 @@ export interface OtherPricing {
   dcCableMetersPerKwp: number;
   /** mét cáp AC / kWp — dùng để tự tính số mét cần, theo mức phổ biến */
   acCableMetersPerKwp: number;
-  /** đ/hệ tủ điện AC/DC */
-  acDcCabinetPrice: number;
+  /** Giá tủ điện AC/DC theo pha + khoảng công suất hệ thống */
+  cabinetTiers: CabinetPriceTier[];
   /** đ/kWp nhân công lắp đặt */
   laborPerKwp: number;
   /** đ/chuyến vận chuyển */
@@ -66,6 +74,23 @@ export const MOUNTING_FACTOR: Record<MountingType, { factor: number; label: stri
     note: "Cần chừa khoảng cách giữa các hàng để tránh che bóng lẫn nhau — diện tích gần gấp đôi footprint tấm pin (dao động 1.8-2.2 lần tuỳ góc nghiêng).",
   },
 };
+
+export function findCabinetTier(
+  tiers: CabinetPriceTier[],
+  phase: Phase,
+  pvSizeKwp: number,
+): CabinetPriceTier | null {
+  const exact = tiers.find((t) => t.phase === phase && pvSizeKwp >= t.minKwp && pvSizeKwp <= t.maxKwp);
+  if (exact) return exact;
+  // Không khớp khoảng nào — lấy mức gần nhất cùng pha để không bỏ trống giá
+  const samePhase = tiers.filter((t) => t.phase === phase);
+  if (samePhase.length === 0) return null;
+  return samePhase.reduce((closest, t) => {
+    const distClosest = pvSizeKwp < closest.minKwp ? closest.minKwp - pvSizeKwp : pvSizeKwp - closest.maxKwp;
+    const distT = pvSizeKwp < t.minKwp ? t.minKwp - pvSizeKwp : pvSizeKwp - t.maxKwp;
+    return Math.abs(distT) < Math.abs(distClosest) ? t : closest;
+  });
+}
 
 export interface EquipmentSelectionResult {
   panelCount: number;

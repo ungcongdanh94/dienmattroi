@@ -10,6 +10,7 @@ import {
 import {
   MOUNTING_FACTOR,
   computeEquipmentSelection,
+  findCabinetTier,
   type MountingType,
   type EquipmentCatalog,
   type PanelSpec,
@@ -59,7 +60,11 @@ const FALLBACK_CATALOG: EquipmentCatalog = {
     acCablePerMeter: 0,
     dcCableMetersPerKwp: 3,
     acCableMetersPerKwp: 1.5,
-    acDcCabinetPrice: 0,
+    cabinetTiers: [
+      { id: "cab-1pha-3-12", phase: "1_pha", minKwp: 3, maxKwp: 12, priceVnd: 0 },
+      { id: "cab-3pha-8-20", phase: "3_pha", minKwp: 8, maxKwp: 20, priceVnd: 0 },
+      { id: "cab-3pha-25-50", phase: "3_pha", minKwp: 25, maxKwp: 50, priceVnd: 0 },
+    ],
     laborPerKwp: 0,
     shippingPerTrip: 0,
   },
@@ -287,7 +292,18 @@ export default function SolarCalculator() {
       },
       { id: "dc_cable", label: "Cáp DC (dự toán)", brandModel: "-", qty: dcCableM, unit: "m", unitPriceVnd: op.dcCablePerMeter },
       { id: "ac_cable", label: "Cáp AC (dự toán)", brandModel: "-", qty: acCableM, unit: "m", unitPriceVnd: op.acCablePerMeter },
-      { id: "ac_dc_cabinet", label: "Tủ điện AC/DC", brandModel: "-", qty: 1, unit: "hệ", unitPriceVnd: op.acDcCabinetPrice },
+      {
+        id: "ac_dc_cabinet",
+        label: "Tủ điện AC/DC",
+        brandModel: selectedInverter
+          ? `${selectedInverter.phase === "1_pha" ? "1 pha" : "3 pha"} · ${result.pvSizeKwp} kWp`
+          : "-",
+        qty: 1,
+        unit: "hệ",
+        unitPriceVnd: selectedInverter
+          ? findCabinetTier(op.cabinetTiers, selectedInverter.phase, result.pvSizeKwp)?.priceVnd ?? 0
+          : 0,
+      },
       { id: "labor", label: "Nhân công", brandModel: "-", qty: result.pvSizeKwp, unit: "kWp", unitPriceVnd: op.laborPerKwp },
       { id: "shipping", label: "Vận chuyển", brandModel: "-", qty: shippingTrips, unit: "chuyến", unitPriceVnd: op.shippingPerTrip },
     );

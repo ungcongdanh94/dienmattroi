@@ -143,7 +143,7 @@ export default function AdminPage() {
   function updateBattery(id: string, patch: Partial<BatterySpec>) {
     setCatalog((c) => (c ? { ...c, batteries: c.batteries.map((b) => (b.id === id ? { ...b, ...patch } : b)) } : c));
   }
-  function updateOtherPricing<K extends keyof EquipmentCatalog["otherPricing"]>(key: K, value: number) {
+  function updateOtherPricing<K extends keyof EquipmentCatalog["otherPricing"]>(key: K, value: EquipmentCatalog["otherPricing"][K]) {
     setCatalog((c) => (c ? { ...c, otherPricing: { ...c.otherPricing, [key]: value } } : c));
   }
   function removeRow(kind: "panels" | "inverters" | "batteries", id: string) {
@@ -307,9 +307,40 @@ export default function AdminPage() {
             <PriceField label="Cáp AC (đ/mét)" value={catalog.otherPricing.acCablePerMeter} onChange={(v) => updateOtherPricing("acCablePerMeter", v)} />
             <RateField label="Mét cáp DC / kWp (mức phổ biến, để tự tính số mét)" value={catalog.otherPricing.dcCableMetersPerKwp} onChange={(v) => updateOtherPricing("dcCableMetersPerKwp", v)} />
             <RateField label="Mét cáp AC / kWp (mức phổ biến, để tự tính số mét)" value={catalog.otherPricing.acCableMetersPerKwp} onChange={(v) => updateOtherPricing("acCableMetersPerKwp", v)} />
-            <PriceField label="Tủ điện AC/DC (đ/hệ)" value={catalog.otherPricing.acDcCabinetPrice} onChange={(v) => updateOtherPricing("acDcCabinetPrice", v)} />
             <PriceField label="Nhân công (đ/kWp)" value={catalog.otherPricing.laborPerKwp} onChange={(v) => updateOtherPricing("laborPerKwp", v)} />
             <PriceField label="Vận chuyển (đ/chuyến)" value={catalog.otherPricing.shippingPerTrip} onChange={(v) => updateOtherPricing("shippingPerTrip", v)} />
+          </div>
+        </div>
+
+        {/* Cabinet pricing tiers */}
+        <div className="mt-6 rounded-2xl border border-line bg-white">
+          <div className="border-b border-line px-5 py-3">
+            <h2 className="font-display font-semibold text-navy">Tủ điện AC/DC — theo pha &amp; công suất</h2>
+            <p className="mt-1 text-xs text-ink/50">Hệ thống tự chọn đúng mức giá theo pha inverter đã chọn và công suất hệ thống tính được.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-3">
+            {catalog.otherPricing.cabinetTiers.map((tier) => (
+              <div key={tier.id} className="rounded-xl bg-surface p-3">
+                <div className="text-xs font-medium text-navy">
+                  {tier.phase === "1_pha" ? "1 pha" : "3 pha"} · {tier.minKwp}-{tier.maxKwp} kWp
+                </div>
+                <input
+                  type="number"
+                  min={0}
+                  step={1000}
+                  value={tier.priceVnd}
+                  onChange={(e) =>
+                    updateOtherPricing(
+                      "cabinetTiers",
+                      catalog.otherPricing.cabinetTiers.map((t) =>
+                        t.id === tier.id ? { ...t, priceVnd: Number(e.target.value) || 0 } : t,
+                      ),
+                    )
+                  }
+                  className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2 text-right font-mono text-sm"
+                />
+              </div>
+            ))}
           </div>
         </div>
 
