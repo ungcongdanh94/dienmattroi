@@ -71,6 +71,7 @@ const FALLBACK_CATALOG: EquipmentCatalog = {
 };
 
 const vnd = (n: number) => Math.round(n).toLocaleString("vi-VN") + " đ";
+const round1 = (n: number) => Math.round(n * 10) / 10;
 
 export default function SolarCalculator() {
   const [customerName, setCustomerName] = useState("");
@@ -250,6 +251,11 @@ export default function SolarCalculator() {
 
   const items: QuoteItem[] = useMemo(() => {
     if (!selectedPanel || !selectedInverter || !equipment) return [];
+
+    // Công suất THỰC LẮP (số tấm × công suất/tấm) — dùng cho khung/cáp/tủ điện/nhân công,
+    // vì thường lớn hơn công suất yêu cầu (result.pvSizeKwp) do làm tròn số tấm lên.
+    const actualCapacityKwp = (equipment.panelCount * selectedPanel.wattage) / 1000;
+
     const list: QuoteItem[] = [
       {
         id: "panel",
@@ -279,14 +285,14 @@ export default function SolarCalculator() {
       });
     }
     const op = catalog.otherPricing;
-    const dcCableM = Math.max(1, Math.round(result.pvSizeKwp * op.dcCableMetersPerKwp));
-    const acCableM = Math.max(1, Math.round(result.pvSizeKwp * op.acCableMetersPerKwp));
+    const dcCableM = Math.max(1, Math.round(actualCapacityKwp * op.dcCableMetersPerKwp));
+    const acCableM = Math.max(1, Math.round(actualCapacityKwp * op.acCableMetersPerKwp));
     list.push(
       {
         id: "frame",
         label: "Khung/giá đỡ",
         brandModel: MOUNTING_FACTOR[mountingType].label,
-        qty: result.pvSizeKwp,
+        qty: round1(actualCapacityKwp),
         unit: "kWp",
         unitPriceVnd: mountingType === "ap_mai" ? op.framePerKwpApMai : op.framePerKwpGiaDoNghieng,
       },
@@ -296,19 +302,19 @@ export default function SolarCalculator() {
         id: "ac_dc_cabinet",
         label: "Tủ điện AC/DC",
         brandModel: selectedInverter
-          ? `${selectedInverter.phase === "1_pha" ? "1 pha" : "3 pha"} · ${result.pvSizeKwp} kWp`
+          ? `${selectedInverter.phase === "1_pha" ? "1 pha" : "3 pha"} · ${round1(actualCapacityKwp)} kWp`
           : "-",
         qty: 1,
         unit: "hệ",
         unitPriceVnd: selectedInverter
-          ? findCabinetTier(op.cabinetTiers, selectedInverter.phase, result.pvSizeKwp)?.priceVnd ?? 0
+          ? findCabinetTier(op.cabinetTiers, selectedInverter.phase, actualCapacityKwp)?.priceVnd ?? 0
           : 0,
       },
-      { id: "labor", label: "Nhân công", brandModel: "-", qty: result.pvSizeKwp, unit: "kWp", unitPriceVnd: op.laborPerKwp },
+      { id: "labor", label: "Nhân công", brandModel: "-", qty: round1(actualCapacityKwp), unit: "kWp", unitPriceVnd: op.laborPerKwp },
       { id: "shipping", label: "Vận chuyển", brandModel: "-", qty: shippingTrips, unit: "chuyến", unitPriceVnd: op.shippingPerTrip },
     );
     return list;
-  }, [equipment, selectedPanel, selectedInverter, selectedBattery, mountingType, result.pvSizeKwp, shippingTrips, catalog.otherPricing]);
+  }, [equipment, selectedPanel, selectedInverter, selectedBattery, mountingType, shippingTrips, catalog.otherPricing]);
 
   const sub = subtotal(items);
   const totalPayment = totalAfterDiscount(sub, discountPercent);
