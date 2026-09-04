@@ -1,12 +1,12 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import { SOLUTIONS } from "@/lib/site-data";
-import PanelIllustration from "./PanelIllustration";
 
-const VISUAL_VARIANT: Record<string, "household" | "business" | "factory"> = {
-  "gia-dinh": "household",
-  "doanh-nghiep": "business",
-  "nha-xuong": "factory",
+const VISUAL_SRC: Record<string, string> = {
+  "gia-dinh": "/images/solution-household.jpg",
+  "doanh-nghiep": "/images/solution-business.jpg",
+  "nha-xuong": "/images/solution-factory.jpg",
 };
 
 export default function Solutions() {
@@ -29,9 +29,12 @@ export default function Solutions() {
               className="group overflow-hidden rounded-card border border-line transition-shadow hover:shadow-lg"
             >
               <div className="relative aspect-[4/3] overflow-hidden">
-                <div className="h-full w-full transition-transform duration-500 group-hover:scale-105">
-                  <PanelIllustration variant={VISUAL_VARIANT[s.id] ?? "household"} />
-                </div>
+                <Image
+                  src={VISUAL_SRC[s.id]}
+                  alt={s.title}
+                  fill
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
+                />
               </div>
               <div className="p-6">
                 <div className="text-xs font-medium text-solarblue">{s.range}</div>

@@ -1,6 +1,6 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight } from "lucide-react";
-import PanelIllustration from "./PanelIllustration";
 
 export default function Hero() {
   return (
@@ -37,10 +37,17 @@ export default function Hero() {
           </div>
         </div>
 
-        {/* Illustrative visual — refined panel array, not a stock photo */}
+        {/* Ảnh minh hoạ hệ thống điện mặt trời */}
         <div className="relative">
           <div className="aspect-[4/3] overflow-hidden rounded-card border border-white/10 shadow-2xl shadow-black/30">
-            <PanelIllustration variant="business" />
+            <Image
+              src="/images/hero.jpg"
+              alt="Hệ thống điện mặt trời lắp trên mái nhà"
+              width={1432}
+              height={1072}
+              className="h-full w-full object-cover"
+              priority
+            />
           </div>
 
           <div className="absolute -bottom-6 -left-6 rounded-2xl border border-line bg-white p-4 shadow-xl sm:-left-10">
