@@ -1,9 +1,8 @@
 /**
  * DỮ LIỆU TRANG MARKETING — CÔNG THẢNH
  * ----------------------------------------------------------------
- * ⚠️ Các mảng dưới đây (PRODUCTS, PROJECTS) là DỮ LIỆU MẪU vì source hiện tại
- * chưa có dữ liệu sản phẩm/dự án thật. Thay bằng dữ liệu, hình ảnh thật của
- * công ty trước khi đưa vào sử dụng chính thức.
+ * ⚠️ SOLUTIONS/PROCESS bên dưới vẫn là nội dung cố định trong code.
+ * Dự án đã thực hiện giờ quản lý qua /admin (xem lib/projects-store.ts).
  */
 
 export const COMPANY = {
@@ -43,12 +42,5 @@ export const PROCESS_STEPS = [
   { step: "04", title: "Bàn giao & giám sát", description: "Nghiệm thu, hướng dẫn vận hành và giám sát hiệu suất dài hạn." },
 ];
 
-/** Ảnh thật do khách hàng/công ty cung cấp. Công suất là ƯỚC TÍNH từ số tấm pin
- * nhìn thấy trong ảnh (không phải số liệu ghi nhận chính thức) — nên cập nhật lại
- * chính xác khi có hồ sơ dự án. Địa điểm để chung "miền Tây Nam Bộ" vì chưa xác nhận
- * huyện/tỉnh cụ thể. */
-export const PROJECTS = [
-  { id: 1, capacity: "~6-7 kWp", type: "Hộ gia đình", location: "Miền Tây Nam Bộ", image: "/images/project-household.jpg" },
-  { id: 2, capacity: "~25-30 kWp", type: "Doanh nghiệp", location: "Miền Tây Nam Bộ", image: "/images/project-business.jpg" },
-  { id: 3, capacity: "~10-12 kWp", type: "Nhà xưởng", location: "Miền Tây Nam Bộ", image: "/images/project-factory.jpg" },
-];
+/** Dự án đã thực hiện giờ được quản lý qua /admin (lib/projects-store.ts + /api/projects),
+ * không còn dùng dữ liệu tĩnh ở đây nữa. */

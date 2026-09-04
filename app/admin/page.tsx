@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { EquipmentCatalog, PanelSpec, InverterSpec, BatterySpec } from "@/lib/catalog-types";
+import type { ProjectEntry } from "@/lib/projects-store";
 
 export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -9,6 +10,9 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState("");
   const [catalog, setCatalog] = useState<EquipmentCatalog | null>(null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [projects, setProjects] = useState<ProjectEntry[] | null>(null);
+  const [projectSaveStatus, setProjectSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/session")
@@ -21,6 +25,9 @@ export default function AdminPage() {
       fetch("/api/catalog")
         .then((r) => r.json())
         .then(setCatalog);
+      fetch("/api/projects")
+        .then((r) => r.json())
+        .then(setProjects);
     }
   }, [authenticated]);
 
@@ -55,6 +62,46 @@ export default function AdminPage() {
     });
     setSaveStatus(res.ok ? "saved" : "error");
     setTimeout(() => setSaveStatus("idle"), 2000);
+  }
+
+  function updateProject(id: string, patch: Partial<ProjectEntry>) {
+    setProjects((list) => (list ? list.map((p) => (p.id === id ? { ...p, ...patch } : p)) : list));
+  }
+  function addProject() {
+    setProjects((list) =>
+      list
+        ? [...list, { id: `proj-${Date.now()}`, capacity: "", type: "", location: "", imageUrl: "" }]
+        : list,
+    );
+  }
+  function removeProject(id: string) {
+    setProjects((list) => (list ? list.filter((p) => p.id !== id) : list));
+  }
+
+  async function handleUploadImage(id: string, file: File) {
+    setUploadingId(id);
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
+    const data = await res.json();
+    if (res.ok && data.url) {
+      updateProject(id, { imageUrl: data.url });
+    } else {
+      alert(data.error || "Tải ảnh thất bại");
+    }
+    setUploadingId(null);
+  }
+
+  async function handleSaveProjects() {
+    if (!projects) return;
+    setProjectSaveStatus("saving");
+    const res = await fetch("/api/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(projects),
+    });
+    setProjectSaveStatus(res.ok ? "saved" : "error");
+    setTimeout(() => setProjectSaveStatus("idle"), 2000);
   }
 
   if (authenticated === null) {
@@ -272,6 +319,91 @@ export default function AdminPage() {
             className="rounded-full bg-navy px-6 py-3 text-sm font-semibold text-white shadow-lg disabled:opacity-50"
           >
             {saveStatus === "saving" ? "Đang lưu…" : saveStatus === "saved" ? "Đã lưu ✓" : saveStatus === "error" ? "Lỗi, thử lại" : "Lưu bảng giá"}
+          </button>
+        </div>
+
+        {/* Projects management */}
+        <div className="mt-10 rounded-2xl border border-line bg-white">
+          <div className="flex items-center justify-between border-b border-line px-5 py-3">
+            <h2 className="font-display text-lg font-semibold text-navy">Dự án đã thực hiện (trang chủ)</h2>
+            {projects && (
+              <button type="button" onClick={addProject} className="text-sm font-medium text-solarblue hover:underline">
+                + Thêm dự án
+              </button>
+            )}
+          </div>
+
+          {!projects ? (
+            <div className="p-5 text-sm text-ink/50">Đang tải…</div>
+          ) : (
+            <div className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-3">
+              {projects.map((p) => (
+                <div key={p.id} className="rounded-xl border border-line p-4">
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-lg bg-surface">
+                    {p.imageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
+                    )}
+                  </div>
+                  <label className="mt-3 block">
+                    <span className="inline-block cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-navy hover:bg-surface">
+                      {uploadingId === p.id ? "Đang tải…" : "Chọn ảnh"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleUploadImage(p.id, file);
+                      }}
+                    />
+                  </label>
+
+                  <div className="mt-3 space-y-2">
+                    <input
+                      value={p.capacity}
+                      onChange={(e) => updateProject(p.id, { capacity: e.target.value })}
+                      placeholder="Công suất (vd: ~8 kWp)"
+                      className="w-full rounded-md border border-line px-2.5 py-1.5 text-sm"
+                    />
+                    <input
+                      value={p.type}
+                      onChange={(e) => updateProject(p.id, { type: e.target.value })}
+                      placeholder="Loại công trình (vd: Hộ gia đình)"
+                      className="w-full rounded-md border border-line px-2.5 py-1.5 text-sm"
+                    />
+                    <input
+                      value={p.location}
+                      onChange={(e) => updateProject(p.id, { location: e.target.value })}
+                      placeholder="Địa điểm"
+                      className="w-full rounded-md border border-line px-2.5 py-1.5 text-sm"
+                    />
+                  </div>
+
+                  <button type="button" onClick={() => removeProject(p.id)} className="mt-3 text-xs text-red-500 hover:underline">
+                    Xoá dự án
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="sticky bottom-4 mt-6 flex justify-end">
+          <button
+            type="button"
+            onClick={handleSaveProjects}
+            disabled={projectSaveStatus === "saving" || !projects}
+            className="rounded-full bg-energy px-6 py-3 text-sm font-semibold text-white shadow-lg disabled:opacity-50"
+          >
+            {projectSaveStatus === "saving"
+              ? "Đang lưu…"
+              : projectSaveStatus === "saved"
+                ? "Đã lưu ✓"
+                : projectSaveStatus === "error"
+                  ? "Lỗi, thử lại"
+                  : "Lưu dự án"}
           </button>
         </div>
       </div>
