@@ -8,11 +8,14 @@ import {
   type SystemType,
 } from "@/lib/solar-calculator";
 import {
-  EQUIPMENT_COMBOS,
   MOUNTING_FACTOR,
-  applyCombo,
+  computeEquipmentSelection,
   type MountingType,
-} from "@/lib/equipment-combos";
+  type EquipmentCatalog,
+  type PanelSpec,
+  type InverterSpec,
+  type BatterySpec,
+} from "@/lib/catalog-types";
 import {
   EVN_TARIFF_2026,
   costForKwhSinhHoat,
@@ -45,6 +48,12 @@ const SYSTEM_LABEL: Record<SystemType, { title: string; desc: string }> = {
   hybrid: { title: "Hybrid", desc: "Hoà lưới + pin backup khi mất điện" },
 };
 
+const FALLBACK_CATALOG: EquipmentCatalog = {
+  panels: [{ id: "aiko-655", brand: "AIKO", wattage: 655, lengthMm: 2382, widthMm: 1134, priceVnd: 0 }],
+  inverters: [{ id: "solis-5", brand: "Solis", capacityKw: 5, priceVnd: 0 }],
+  batteries: [{ id: "dyness-14336", brand: "Dyness", moduleKwh: 14.336, priceVnd: 0 }],
+};
+
 const vnd = (n: number) => Math.round(n).toLocaleString("vi-VN") + " đ";
 
 export default function SolarCalculator() {
@@ -73,7 +82,29 @@ export default function SolarCalculator() {
   const [backupLoadPercent, setBackupLoadPercent] = useState<number>(40);
   const [dayUsagePercent, setDayUsagePercent] = useState<number>(60);
   const [mountingType, setMountingType] = useState<MountingType>("ap_mai");
-  const [selectedComboId, setSelectedComboId] = useState<string>(EQUIPMENT_COMBOS[0].id);
+  const [catalog, setCatalog] = useState<EquipmentCatalog>(FALLBACK_CATALOG);
+  const [panelBrand, setPanelBrand] = useState<string>(FALLBACK_CATALOG.panels[0].brand);
+  const [panelId, setPanelId] = useState<string>(FALLBACK_CATALOG.panels[0].id);
+  const [inverterBrand, setInverterBrand] = useState<string>(FALLBACK_CATALOG.inverters[0].brand);
+  const [inverterId, setInverterId] = useState<string>(FALLBACK_CATALOG.inverters[0].id);
+  const [batteryBrand, setBatteryBrand] = useState<string>(FALLBACK_CATALOG.batteries[0].brand);
+  const [batteryId, setBatteryId] = useState<string>(FALLBACK_CATALOG.batteries[0].id);
+
+  useEffect(() => {
+    fetch("/api/catalog")
+      .then((r) => r.json())
+      .then((data: EquipmentCatalog) => {
+        if (!data?.panels?.length) return;
+        setCatalog(data);
+        setPanelBrand(data.panels[0].brand);
+        setPanelId(data.panels[0].id);
+        setInverterBrand(data.inverters[0]?.brand ?? "");
+        setInverterId(data.inverters[0]?.id ?? "");
+        setBatteryBrand(data.batteries[0]?.brand ?? "");
+        setBatteryId(data.batteries[0]?.id ?? "");
+      })
+      .catch(() => {});
+  }, []);
 
   const [unitPrices, setUnitPrices] = useState<Record<string, number>>({});
   const [dcCableM, setDcCableM] = useState<number>(20);
@@ -143,39 +174,78 @@ export default function SolarCalculator() {
     [monthlyKwh, dayUsagePercent, systemType, offsetPercent, batteryType, autonomyDays, backupHours, backupLoadPercent],
   );
 
-  const comboResults = useMemo(
-    () => EQUIPMENT_COMBOS.map((combo) => applyCombo(combo, result.pvSizeKwp, result.inverterSizeKw, result.batteryCapacityKwh, mountingType)),
-    [result, mountingType],
+  const panelBrands = useMemo(() => Array.from(new Set(catalog.panels.map((p) => p.brand))), [catalog]);
+  const inverterBrands = useMemo(() => Array.from(new Set(catalog.inverters.map((i) => i.brand))), [catalog]);
+  const batteryBrands = useMemo(() => Array.from(new Set(catalog.batteries.map((b) => b.brand))), [catalog]);
+
+  const panelsForBrand = catalog.panels.filter((p) => p.brand === panelBrand);
+  const invertersForBrand = catalog.inverters.filter((i) => i.brand === inverterBrand);
+  const batteriesForBrand = catalog.batteries.filter((b) => b.brand === batteryBrand);
+
+  const selectedPanel: PanelSpec | undefined = panelsForBrand.find((p) => p.id === panelId) ?? panelsForBrand[0];
+  const selectedInverter: InverterSpec | undefined = invertersForBrand.find((i) => i.id === inverterId) ?? invertersForBrand[0];
+  const selectedBattery: BatterySpec | undefined = batteriesForBrand.find((b) => b.id === batteryId) ?? batteriesForBrand[0];
+
+  function handlePanelBrandChange(brand: string) {
+    setPanelBrand(brand);
+    const first = catalog.panels.find((p) => p.brand === brand);
+    if (first) setPanelId(first.id);
+  }
+  function handleInverterBrandChange(brand: string) {
+    setInverterBrand(brand);
+    const first = catalog.inverters.find((i) => i.brand === brand);
+    if (first) setInverterId(first.id);
+  }
+  function handleBatteryBrandChange(brand: string) {
+    setBatteryBrand(brand);
+    const first = catalog.batteries.find((b) => b.brand === brand);
+    if (first) setBatteryId(first.id);
+  }
+
+  const inverterMeetsRequirement = selectedInverter ? selectedInverter.capacityKw >= result.inverterSizeKw : false;
+
+  const equipment = useMemo(
+    () =>
+      selectedPanel
+        ? computeEquipmentSelection(
+            selectedPanel,
+            result.batteryCapacityKwh !== null ? selectedBattery ?? null : null,
+            result.pvSizeKwp,
+            result.batteryCapacityKwh,
+            mountingType,
+          )
+        : null,
+    [selectedPanel, selectedBattery, result, mountingType],
   );
-  const selectedCombo = comboResults.find((cr) => cr.combo.id === selectedComboId) ?? comboResults[0];
 
   const items: QuoteItem[] = useMemo(() => {
+    if (!selectedPanel || !selectedInverter || !equipment) return [];
     const list: QuoteItem[] = [
       {
         id: "panel",
-        label: `Tấm pin ${selectedCombo.combo.panelWattage}Wp`,
-        brandModel: selectedCombo.combo.panelBrand,
-        qty: selectedCombo.panelCount,
+        label: `Tấm pin ${selectedPanel.wattage}Wp`,
+        brandModel: selectedPanel.brand,
+        qty: equipment.panelCount,
         unit: "tấm",
-        unitPriceVnd: unitPrices.panel ?? 0,
+        unitPriceVnd: selectedPanel.priceVnd,
       },
       {
         id: "inverter",
-        label: `Inverter ~${selectedCombo.inverterCapacityKw}kW`,
-        brandModel: selectedCombo.combo.inverterBrand,
+        label: `Inverter ${selectedInverter.capacityKw}kW`,
+        brandModel: selectedInverter.brand,
         qty: 1,
         unit: "bộ",
-        unitPriceVnd: unitPrices.inverter ?? 0,
+        unitPriceVnd: selectedInverter.priceVnd,
       },
     ];
-    if (selectedCombo.batteryModuleCount !== null) {
+    if (equipment.batteryModuleCount !== null && selectedBattery) {
       list.push({
         id: "battery",
-        label: `Pin ${selectedCombo.combo.batteryModuleKwh}kWh`,
-        brandModel: selectedCombo.combo.batteryBrand,
-        qty: selectedCombo.batteryModuleCount,
+        label: `Pin ${selectedBattery.moduleKwh}kWh`,
+        brandModel: selectedBattery.brand,
+        qty: equipment.batteryModuleCount,
         unit: "bộ",
-        unitPriceVnd: unitPrices.battery ?? 0,
+        unitPriceVnd: selectedBattery.priceVnd,
       });
     }
     list.push(
@@ -194,7 +264,7 @@ export default function SolarCalculator() {
       { id: "shipping", label: "Vận chuyển", brandModel: "-", qty: shippingTrips, unit: "chuyến", unitPriceVnd: unitPrices.shipping ?? 0 },
     );
     return list;
-  }, [selectedCombo, mountingType, result.pvSizeKwp, dcCableM, acCableM, shippingTrips, unitPrices]);
+  }, [equipment, selectedPanel, selectedInverter, selectedBattery, mountingType, result.pvSizeKwp, dcCableM, acCableM, shippingTrips, unitPrices]);
 
   const sub = subtotal(items);
   const totalPayment = totalAfterDiscount(sub, discountPercent);
@@ -204,16 +274,19 @@ export default function SolarCalculator() {
   const paybackYears = simplePaybackYears(totalPayment, savingsPerMonth);
   const loan = calculateLoan({ totalInvestmentVnd: totalPayment, loanPercent, interestRatePercent, annualSavingsVnd: savingsPerYear });
 
+  const hasBatteryItem = items.some((it) => it.id === "battery");
   const depreciationRows = calculateDepreciation(
-    [
-      { label: "Tấm pin (PV)", valueVnd: itemTotal(items[0]) },
-      { label: "Inverter", valueVnd: itemTotal(items[1]) },
-      ...(selectedCombo.batteryModuleCount !== null ? [{ label: "Pin lưu trữ", valueVnd: itemTotal(items[2]) }] : []),
-      {
-        label: "Khung/cáp/tủ/NC/ship",
-        valueVnd: items.slice(selectedCombo.batteryModuleCount !== null ? 3 : 2).reduce((s, it) => s + itemTotal(it), 0),
-      },
-    ],
+    items.length === 0
+      ? []
+      : [
+          { label: "Tấm pin (PV)", valueVnd: itemTotal(items[0]) },
+          { label: "Inverter", valueVnd: itemTotal(items[1]) },
+          ...(hasBatteryItem ? [{ label: "Pin lưu trữ", valueVnd: itemTotal(items[2]) }] : []),
+          {
+            label: "Khung/cáp/tủ/NC/ship",
+            valueVnd: items.slice(hasBatteryItem ? 3 : 2).reduce((s, it) => s + itemTotal(it), 0),
+          },
+        ],
     depreciationYears,
   );
   const totalDepreciationPerYear = depreciationRows.reduce((s, r) => s + r.perYearVnd, 0);
@@ -515,10 +588,10 @@ export default function SolarCalculator() {
           </div>
         </section>
 
-        {/* Combo selection */}
+        {/* Equipment selection */}
         <section className="mt-8">
           <h2 className="font-display text-lg font-semibold text-navy">Chọn combo thiết bị</h2>
-          <p className="mt-1 text-[13px] text-ink/55">2 lựa chọn để khách hàng so sánh — diện tích tính theo kích thước tấm pin thật.</p>
+          <p className="mt-1 text-[13px] text-ink/55">Chọn riêng từng loại thiết bị — diện tích tính theo kích thước tấm pin thật.</p>
 
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {(Object.keys(MOUNTING_FACTOR) as MountingType[]).map((key) => (
@@ -537,42 +610,139 @@ export default function SolarCalculator() {
             ))}
           </div>
 
-          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {comboResults.map((cr) => {
-              const active = cr.combo.id === selectedComboId;
-              return (
-                <button
-                  key={cr.combo.id}
-                  type="button"
-                  onClick={() => setSelectedComboId(cr.combo.id)}
+          <div className="mt-4 grid grid-cols-1 gap-6 rounded-2xl border border-line bg-white p-5 sm:grid-cols-3">
+            {/* Tấm pin */}
+            <div className="space-y-3">
+              <div>
+                <Label>Thương hiệu tấm pin</Label>
+                <select
+                  value={panelBrand}
+                  onChange={(e) => handlePanelBrandChange(e.target.value)}
+                  className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
+                >
+                  {panelBrands.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>Công suất tấm pin</Label>
+                <select
+                  value={panelId}
+                  onChange={(e) => setPanelId(e.target.value)}
+                  className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
+                >
+                  {panelsForBrand.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.wattage} Wp
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Inverter */}
+            <div className="space-y-3">
+              <div>
+                <Label>Thương hiệu inverter</Label>
+                <select
+                  value={inverterBrand}
+                  onChange={(e) => handleInverterBrandChange(e.target.value)}
+                  className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
+                >
+                  {inverterBrands.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>Công suất inverter</Label>
+                <select
+                  value={inverterId}
+                  onChange={(e) => setInverterId(e.target.value)}
                   className={[
-                    "rounded-2xl border bg-white p-5 text-left transition-colors",
-                    active ? "border-navy ring-1 ring-navy" : "border-line hover:border-navy/40",
+                    "mt-2 w-full rounded-lg border px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2",
+                    inverterMeetsRequirement ? "border-line focus:border-navy focus:ring-navy/10" : "border-red-400 focus:border-red-500 focus:ring-red-100",
                   ].join(" ")}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="font-display font-semibold text-navy">{cr.combo.name}</div>
-                    {active && <span className="rounded-md bg-sun px-2 py-0.5 text-[11px] font-medium text-navy">Đang chọn</span>}
-                  </div>
-                  <div className="text-[13px] text-ink/50">
-                    {cr.combo.panelBrand} {cr.combo.panelWattage}W · {cr.combo.inverterBrand} · {cr.combo.batteryBrand}
-                  </div>
-                  <div className="mt-3 space-y-2 text-sm">
-                    <Row label={`Tấm pin (${cr.panelAreaM2} m²/tấm)`} value={`${cr.panelCount} tấm`} />
-                    <Row label="Diện tích mái cần lắp" value={`${cr.installedAreaM2} m²`} accent="#E8A33D" />
-                    <Row label="Inverter" value={`${cr.inverterCapacityKw} kW`} />
-                    {cr.batteryModuleCount !== null && <Row label="Pin lưu trữ" value={`${cr.batteryModuleCount} module`} />}
-                  </div>
-                </button>
-              );
-            })}
+                  {invertersForBrand.map((inv) => (
+                    <option key={inv.id} value={inv.id}>
+                      {inv.capacityKw} kW
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Pin lưu trữ */}
+            <div className="space-y-3">
+              <div>
+                <Label>Thương hiệu pin lưu trữ</Label>
+                <select
+                  value={batteryBrand}
+                  onChange={(e) => handleBatteryBrandChange(e.target.value)}
+                  disabled={result.batteryCapacityKwh === null}
+                  className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10 disabled:bg-surface disabled:text-ink/40"
+                >
+                  {batteryBrands.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>Công suất pin lưu trữ</Label>
+                <select
+                  value={batteryId}
+                  onChange={(e) => setBatteryId(e.target.value)}
+                  disabled={result.batteryCapacityKwh === null}
+                  className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10 disabled:bg-surface disabled:text-ink/40"
+                >
+                  {batteriesForBrand.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.moduleKwh} kWh
+                    </option>
+                  ))}
+                </select>
+                {result.batteryCapacityKwh === null && <p className="mt-1.5 text-xs text-ink/40">Hệ on-grid không cần pin.</p>}
+              </div>
+            </div>
           </div>
+
+          {!inverterMeetsRequirement && selectedInverter && (
+            <div className="mt-3 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-700">
+              <strong>Lỗi:</strong> Inverter {selectedInverter.brand} {selectedInverter.capacityKw}kW không đủ công suất —
+              hệ thống cần tối thiểu <strong>{result.inverterSizeKw} kW</strong>. Vui lòng chọn công suất lớn hơn.
+            </div>
+          )}
+
+          {equipment && selectedPanel && selectedInverter && (
+            <div className="mt-4 rounded-2xl border border-line bg-white p-5">
+              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-4">
+                <Row label={`Tấm pin (${equipment.panelAreaM2} m²/tấm)`} value={`${equipment.panelCount} tấm`} />
+                <Row label="Diện tích mái cần lắp" value={`${equipment.installedAreaM2} m²`} accent="#F4B63F" />
+                <Row label="Inverter" value={`${selectedInverter.capacityKw} kW`} accent={inverterMeetsRequirement ? undefined : "#DC2626"} />
+                {equipment.batteryModuleCount !== null && <Row label="Pin lưu trữ" value={`${equipment.batteryModuleCount} module`} />}
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Quote table */}
         <section className="mt-8">
           <h2 className="font-display text-lg font-semibold text-navy">Bảng kê vật tư &amp; báo giá</h2>
-          <p className="mt-1 text-[13px] text-ink/55">Nhập đơn giá từng hạng mục — số lượng đã tự tính theo công suất.</p>
+          <p className="mt-1 text-[13px] text-ink/55">
+            Giá tấm pin/inverter/pin lưu trữ lấy từ{" "}
+            <a href="/admin" target="_blank" rel="noreferrer" className="text-solarblue underline-offset-2 hover:underline">
+              bảng giá quản trị
+            </a>
+            . Các hạng mục còn lại nhập tay theo báo giá thực tế.
+          </p>
           <div className="mt-3 overflow-x-auto rounded-2xl border border-line bg-white">
             <table className="w-full text-sm">
               <thead>
@@ -602,15 +772,19 @@ export default function SolarCalculator() {
                       {it.id !== "dc_cable" && it.id !== "ac_cable" && it.id !== "shipping" ? "" : ` ${it.unit}`}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <input
-                        type="number"
-                        min={0}
-                        step={1000}
-                        value={it.unitPriceVnd || ""}
-                        placeholder="0"
-                        onChange={(e) => setUnitPrice(it.id, Number(e.target.value) || 0)}
-                        className="w-28 rounded-md border border-line px-2.5 py-1.5 text-right font-mono"
-                      />
+                      {["panel", "inverter", "battery"].includes(it.id) ? (
+                        <span className="font-mono text-ink/70">{vnd(it.unitPriceVnd)}</span>
+                      ) : (
+                        <input
+                          type="number"
+                          min={0}
+                          step={1000}
+                          value={it.unitPriceVnd || ""}
+                          placeholder="0"
+                          onChange={(e) => setUnitPrice(it.id, Number(e.target.value) || 0)}
+                          className="w-28 rounded-md border border-line px-2.5 py-1.5 text-right font-mono"
+                        />
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right font-mono font-medium">{vnd(itemTotal(it))}</td>
                   </tr>
