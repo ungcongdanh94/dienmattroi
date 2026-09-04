@@ -50,7 +50,7 @@ const SYSTEM_LABEL: Record<SystemType, { title: string; desc: string }> = {
 
 const FALLBACK_CATALOG: EquipmentCatalog = {
   panels: [{ id: "aiko-655", brand: "AIKO", wattage: 655, lengthMm: 2382, widthMm: 1134, priceVnd: 0 }],
-  inverters: [{ id: "solis-5", brand: "Solis", capacityKw: 5, priceVnd: 0 }],
+  inverters: [{ id: "solis-5", brand: "Solis", phase: "1_pha", capacityKw: 5, priceVnd: 0 }],
   batteries: [{ id: "dyness-14336", brand: "Dyness", moduleKwh: 14.336, priceVnd: 0 }],
   otherPricing: {
     framePerKwpApMai: 0,
@@ -95,6 +95,7 @@ export default function SolarCalculator() {
   const [panelBrand, setPanelBrand] = useState<string>(FALLBACK_CATALOG.panels[0].brand);
   const [panelId, setPanelId] = useState<string>(FALLBACK_CATALOG.panels[0].id);
   const [inverterBrand, setInverterBrand] = useState<string>(FALLBACK_CATALOG.inverters[0].brand);
+  const [inverterPhase, setInverterPhase] = useState<"1_pha" | "3_pha">(FALLBACK_CATALOG.inverters[0].phase);
   const [inverterId, setInverterId] = useState<string>(FALLBACK_CATALOG.inverters[0].id);
   const [batteryBrand, setBatteryBrand] = useState<string>(FALLBACK_CATALOG.batteries[0].brand);
   const [batteryId, setBatteryId] = useState<string>(FALLBACK_CATALOG.batteries[0].id);
@@ -114,6 +115,7 @@ export default function SolarCalculator() {
         setPanelBrand(safe.panels[0].brand);
         setPanelId(safe.panels[0].id);
         setInverterBrand(safe.inverters[0]?.brand ?? "");
+        setInverterPhase(safe.inverters[0]?.phase ?? "1_pha");
         setInverterId(safe.inverters[0]?.id ?? "");
         setBatteryBrand(safe.batteries[0]?.brand ?? "");
         setBatteryId(safe.batteries[0]?.id ?? "");
@@ -193,7 +195,7 @@ export default function SolarCalculator() {
   const batteryBrands = useMemo(() => Array.from(new Set(catalog.batteries.map((b) => b.brand))), [catalog]);
 
   const panelsForBrand = catalog.panels.filter((p) => p.brand === panelBrand);
-  const invertersForBrand = catalog.inverters.filter((i) => i.brand === inverterBrand);
+  const invertersForBrand = catalog.inverters.filter((i) => i.brand === inverterBrand && i.phase === inverterPhase);
   const batteriesForBrand = catalog.batteries.filter((b) => b.brand === batteryBrand);
 
   const selectedPanel: PanelSpec | undefined = panelsForBrand.find((p) => p.id === panelId) ?? panelsForBrand[0];
@@ -207,7 +209,15 @@ export default function SolarCalculator() {
   }
   function handleInverterBrandChange(brand: string) {
     setInverterBrand(brand);
-    const first = catalog.inverters.find((i) => i.brand === brand);
+    const first = catalog.inverters.find((i) => i.brand === brand && i.phase === inverterPhase) ?? catalog.inverters.find((i) => i.brand === brand);
+    if (first) {
+      setInverterId(first.id);
+      setInverterPhase(first.phase);
+    }
+  }
+  function handleInverterPhaseChange(phase: "1_pha" | "3_pha") {
+    setInverterPhase(phase);
+    const first = catalog.inverters.find((i) => i.brand === inverterBrand && i.phase === phase);
     if (first) setInverterId(first.id);
   }
   function handleBatteryBrandChange(brand: string) {
@@ -245,7 +255,7 @@ export default function SolarCalculator() {
       },
       {
         id: "inverter",
-        label: `Inverter ${selectedInverter.capacityKw}kW`,
+        label: `Inverter ${selectedInverter.capacityKw}kW ${selectedInverter.phase === "1_pha" ? "1 pha" : "3 pha"}`,
         brandModel: selectedInverter.brand,
         qty: 1,
         unit: "bộ",
@@ -671,6 +681,17 @@ export default function SolarCalculator() {
                 </select>
               </div>
               <div>
+                <Label>Số pha</Label>
+                <select
+                  value={inverterPhase}
+                  onChange={(e) => handleInverterPhaseChange(e.target.value as "1_pha" | "3_pha")}
+                  className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
+                >
+                  <option value="1_pha">1 pha</option>
+                  <option value="3_pha">3 pha</option>
+                </select>
+              </div>
+              <div>
                 <Label>Công suất inverter</Label>
                 <select
                   value={inverterId}
@@ -680,6 +701,7 @@ export default function SolarCalculator() {
                     inverterMeetsRequirement ? "border-line focus:border-navy focus:ring-navy/10" : "border-red-400 focus:border-red-500 focus:ring-red-100",
                   ].join(" ")}
                 >
+                  {invertersForBrand.length === 0 && <option value="">Không có model phù hợp</option>}
                   {invertersForBrand.map((inv) => (
                     <option key={inv.id} value={inv.id}>
                       {inv.capacityKw} kW
@@ -737,7 +759,7 @@ export default function SolarCalculator() {
               <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-4">
                 <Row label={`Tấm pin (${equipment.panelAreaM2} m²/tấm)`} value={`${equipment.panelCount} tấm`} />
                 <Row label="Diện tích mái cần lắp" value={`${equipment.installedAreaM2} m²`} accent="#F4B63F" />
-                <Row label="Inverter" value={`${selectedInverter.capacityKw} kW`} accent={inverterMeetsRequirement ? undefined : "#DC2626"} />
+                <Row label="Inverter" value={`${selectedInverter.capacityKw} kW · ${selectedInverter.phase === "1_pha" ? "1 pha" : "3 pha"}`} accent={inverterMeetsRequirement ? undefined : "#DC2626"} />
                 {equipment.batteryModuleCount !== null && <Row label="Pin lưu trữ" value={`${equipment.batteryModuleCount} module`} />}
               </div>
             </div>

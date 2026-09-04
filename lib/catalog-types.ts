@@ -7,9 +7,12 @@ export interface PanelSpec {
   priceVnd: number;
 }
 
+export type Phase = "1_pha" | "3_pha";
+
 export interface InverterSpec {
   id: string;
   brand: string;
+  phase: Phase;
   capacityKw: number;
   priceVnd: number;
 }
