@@ -102,15 +102,21 @@ export default function SolarCalculator() {
   useEffect(() => {
     fetch("/api/catalog")
       .then((r) => r.json())
-      .then((data: EquipmentCatalog) => {
+      .then((data: Partial<EquipmentCatalog>) => {
         if (!data?.panels?.length) return;
-        setCatalog(data);
-        setPanelBrand(data.panels[0].brand);
-        setPanelId(data.panels[0].id);
-        setInverterBrand(data.inverters[0]?.brand ?? "");
-        setInverterId(data.inverters[0]?.id ?? "");
-        setBatteryBrand(data.batteries[0]?.brand ?? "");
-        setBatteryId(data.batteries[0]?.id ?? "");
+        const safe: EquipmentCatalog = {
+          panels: data.panels,
+          inverters: data.inverters?.length ? data.inverters : FALLBACK_CATALOG.inverters,
+          batteries: data.batteries?.length ? data.batteries : FALLBACK_CATALOG.batteries,
+          otherPricing: { ...FALLBACK_CATALOG.otherPricing, ...(data.otherPricing ?? {}) },
+        };
+        setCatalog(safe);
+        setPanelBrand(safe.panels[0].brand);
+        setPanelId(safe.panels[0].id);
+        setInverterBrand(safe.inverters[0]?.brand ?? "");
+        setInverterId(safe.inverters[0]?.id ?? "");
+        setBatteryBrand(safe.batteries[0]?.brand ?? "");
+        setBatteryId(safe.batteries[0]?.id ?? "");
       })
       .catch(() => {});
   }, []);

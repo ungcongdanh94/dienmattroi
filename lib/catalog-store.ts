@@ -55,7 +55,17 @@ export function getCatalog(): EquipmentCatalog {
       return DEFAULT_CATALOG;
     }
     const raw = fs.readFileSync(CATALOG_PATH, "utf-8");
-    return JSON.parse(raw) as EquipmentCatalog;
+    const parsed = JSON.parse(raw) as Partial<EquipmentCatalog>;
+
+    // Vá dữ liệu cũ: nếu file đã lưu từ trước khi có trường mới (vd otherPricing),
+    // merge với giá trị mặc định thay vì để undefined làm crash app.
+    const merged: EquipmentCatalog = {
+      panels: parsed.panels?.length ? parsed.panels : DEFAULT_CATALOG.panels,
+      inverters: parsed.inverters?.length ? parsed.inverters : DEFAULT_CATALOG.inverters,
+      batteries: parsed.batteries?.length ? parsed.batteries : DEFAULT_CATALOG.batteries,
+      otherPricing: { ...DEFAULT_CATALOG.otherPricing, ...(parsed.otherPricing ?? {}) },
+    };
+    return merged;
   } catch {
     return DEFAULT_CATALOG;
   }
