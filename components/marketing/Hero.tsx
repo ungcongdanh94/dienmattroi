@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import PanelIllustration from "./PanelIllustration";
 
 export default function Hero() {
   return (
@@ -36,16 +37,10 @@ export default function Hero() {
           </div>
         </div>
 
-        {/* Illustrative visual — panel grid, not a stock photo */}
+        {/* Illustrative visual — refined panel array, not a stock photo */}
         <div className="relative">
-          <div className="grid grid-cols-4 gap-2 rounded-card border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/30">
-            {Array.from({ length: 16 }).map((_, i) => (
-              <div
-                key={i}
-                className="aspect-[4/3] rounded-md bg-gradient-to-br from-solarblue/50 to-navy/10"
-                style={{ opacity: 0.55 + ((i * 7) % 5) * 0.09 }}
-              />
-            ))}
+          <div className="aspect-[4/3] overflow-hidden rounded-card border border-white/10 shadow-2xl shadow-black/30">
+            <PanelIllustration variant="business" />
           </div>
 
           <div className="absolute -bottom-6 -left-6 rounded-2xl border border-line bg-white p-4 shadow-xl sm:-left-10">

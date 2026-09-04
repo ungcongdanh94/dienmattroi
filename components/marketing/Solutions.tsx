@@ -1,6 +1,13 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { SOLUTIONS } from "@/lib/site-data";
+import PanelIllustration from "./PanelIllustration";
+
+const VISUAL_VARIANT: Record<string, "household" | "business" | "factory"> = {
+  "gia-dinh": "household",
+  "doanh-nghiep": "business",
+  "nha-xuong": "factory",
+};
 
 export default function Solutions() {
   return (
@@ -21,11 +28,9 @@ export default function Solutions() {
               href="/tinh-toan"
               className="group overflow-hidden rounded-card border border-line transition-shadow hover:shadow-lg"
             >
-              <div className="relative aspect-[4/3] overflow-hidden bg-navy">
-                <div className="absolute inset-0 grid grid-cols-5 gap-1 p-4 opacity-70 transition-transform duration-500 group-hover:scale-105">
-                  {Array.from({ length: 20 }).map((_, i) => (
-                    <div key={i} className="rounded-sm bg-solarblue/40" style={{ opacity: 0.4 + ((i * 5) % 6) * 0.08 }} />
-                  ))}
+              <div className="relative aspect-[4/3] overflow-hidden">
+                <div className="h-full w-full transition-transform duration-500 group-hover:scale-105">
+                  <PanelIllustration variant={VISUAL_VARIANT[s.id] ?? "household"} />
                 </div>
               </div>
               <div className="p-6">

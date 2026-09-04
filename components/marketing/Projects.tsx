@@ -1,4 +1,7 @@
 import { PROJECTS } from "@/lib/site-data";
+import PanelIllustration from "./PanelIllustration";
+
+const VARIANTS = ["household", "business", "factory"] as const;
 
 export default function Projects() {
   return (
@@ -7,14 +10,10 @@ export default function Projects() {
         <h2 className="font-display text-[28px] font-semibold text-navy sm:text-3xl">Dự án đã thực hiện</h2>
 
         <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-3">
-          {PROJECTS.map((p) => (
+          {PROJECTS.map((p, i) => (
             <div key={p.id} className="overflow-hidden rounded-card border border-line bg-white">
-              <div className="relative aspect-[4/3] overflow-hidden bg-navy">
-                <div className="absolute inset-0 grid grid-cols-6 gap-1 p-4 opacity-60">
-                  {Array.from({ length: 24 }).map((_, i) => (
-                    <div key={i} className="rounded-sm bg-solarblue/40" style={{ opacity: 0.35 + ((i * 3) % 6) * 0.08 }} />
-                  ))}
-                </div>
+              <div className="relative aspect-[4/3] overflow-hidden">
+                <PanelIllustration variant={VARIANTS[i % VARIANTS.length]} />
               </div>
               <div className="p-5">
                 <div className="font-mono text-lg font-semibold text-navy">{p.capacity}</div>
