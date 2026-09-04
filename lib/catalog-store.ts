@@ -37,6 +37,15 @@ const DEFAULT_CATALOG: EquipmentCatalog = {
     { id: "dyness-14336", brand: "Dyness", moduleKwh: 14.336, priceVnd: 0 },
     { id: "sofar-16", brand: "Sofar", moduleKwh: 16, priceVnd: 0 },
   ],
+  otherPricing: {
+    framePerKwpApMai: 0,
+    framePerKwpGiaDoNghieng: 0,
+    dcCablePerMeter: 0,
+    acCablePerMeter: 0,
+    acDcCabinetPrice: 0,
+    laborPerKwp: 0,
+    shippingPerTrip: 0,
+  },
 };
 
 export function getCatalog(): EquipmentCatalog {

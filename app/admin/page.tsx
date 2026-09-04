@@ -96,6 +96,9 @@ export default function AdminPage() {
   function updateBattery(id: string, patch: Partial<BatterySpec>) {
     setCatalog((c) => (c ? { ...c, batteries: c.batteries.map((b) => (b.id === id ? { ...b, ...patch } : b)) } : c));
   }
+  function updateOtherPricing<K extends keyof EquipmentCatalog["otherPricing"]>(key: K, value: number) {
+    setCatalog((c) => (c ? { ...c, otherPricing: { ...c.otherPricing, [key]: value } } : c));
+  }
   function removeRow(kind: "panels" | "inverters" | "batteries", id: string) {
     setCatalog((c) => (c ? { ...c, [kind]: (c[kind] as { id: string }[]).filter((x) => x.id !== id) } : c));
   }
@@ -234,6 +237,22 @@ export default function AdminPage() {
           </table>
         </CatalogSection>
 
+        {/* Other pricing */}
+        <div className="mt-6 rounded-2xl border border-line bg-white">
+          <div className="border-b border-line px-5 py-3">
+            <h2 className="font-display font-semibold text-navy">Chi phí khác</h2>
+          </div>
+          <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
+            <PriceField label="Khung/giá đỡ — Áp mái tôn (đ/kWp)" value={catalog.otherPricing.framePerKwpApMai} onChange={(v) => updateOtherPricing("framePerKwpApMai", v)} />
+            <PriceField label="Khung/giá đỡ — Giá đỡ nghiêng (đ/kWp)" value={catalog.otherPricing.framePerKwpGiaDoNghieng} onChange={(v) => updateOtherPricing("framePerKwpGiaDoNghieng", v)} />
+            <PriceField label="Cáp DC (đ/mét)" value={catalog.otherPricing.dcCablePerMeter} onChange={(v) => updateOtherPricing("dcCablePerMeter", v)} />
+            <PriceField label="Cáp AC (đ/mét)" value={catalog.otherPricing.acCablePerMeter} onChange={(v) => updateOtherPricing("acCablePerMeter", v)} />
+            <PriceField label="Tủ điện AC/DC (đ/hệ)" value={catalog.otherPricing.acDcCabinetPrice} onChange={(v) => updateOtherPricing("acDcCabinetPrice", v)} />
+            <PriceField label="Nhân công (đ/kWp)" value={catalog.otherPricing.laborPerKwp} onChange={(v) => updateOtherPricing("laborPerKwp", v)} />
+            <PriceField label="Vận chuyển (đ/chuyến)" value={catalog.otherPricing.shippingPerTrip} onChange={(v) => updateOtherPricing("shippingPerTrip", v)} />
+          </div>
+        </div>
+
         <div className="sticky bottom-4 mt-8 flex justify-end">
           <button
             type="button"
@@ -245,6 +264,22 @@ export default function AdminPage() {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PriceField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <div>
+      <label className="block text-xs text-ink/55">{label}</label>
+      <input
+        type="number"
+        min={0}
+        step={1000}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value) || 0)}
+        className="mt-1.5 w-full rounded-lg border border-line px-3 py-2 text-right font-mono text-sm"
+      />
     </div>
   );
 }

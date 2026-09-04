@@ -52,6 +52,15 @@ const FALLBACK_CATALOG: EquipmentCatalog = {
   panels: [{ id: "aiko-655", brand: "AIKO", wattage: 655, lengthMm: 2382, widthMm: 1134, priceVnd: 0 }],
   inverters: [{ id: "solis-5", brand: "Solis", capacityKw: 5, priceVnd: 0 }],
   batteries: [{ id: "dyness-14336", brand: "Dyness", moduleKwh: 14.336, priceVnd: 0 }],
+  otherPricing: {
+    framePerKwpApMai: 0,
+    framePerKwpGiaDoNghieng: 0,
+    dcCablePerMeter: 0,
+    acCablePerMeter: 0,
+    acDcCabinetPrice: 0,
+    laborPerKwp: 0,
+    shippingPerTrip: 0,
+  },
 };
 
 const vnd = (n: number) => Math.round(n).toLocaleString("vi-VN") + " đ";
@@ -106,7 +115,6 @@ export default function SolarCalculator() {
       .catch(() => {});
   }, []);
 
-  const [unitPrices, setUnitPrices] = useState<Record<string, number>>({});
   const [dcCableM, setDcCableM] = useState<number>(20);
   const [acCableM, setAcCableM] = useState<number>(15);
   const [shippingTrips, setShippingTrips] = useState<number>(1);
@@ -248,6 +256,7 @@ export default function SolarCalculator() {
         unitPriceVnd: selectedBattery.priceVnd,
       });
     }
+    const op = catalog.otherPricing;
     list.push(
       {
         id: "frame",
@@ -255,16 +264,16 @@ export default function SolarCalculator() {
         brandModel: MOUNTING_FACTOR[mountingType].label,
         qty: result.pvSizeKwp,
         unit: "kWp",
-        unitPriceVnd: unitPrices.frame ?? 0,
+        unitPriceVnd: mountingType === "ap_mai" ? op.framePerKwpApMai : op.framePerKwpGiaDoNghieng,
       },
-      { id: "dc_cable", label: "Cáp DC", brandModel: "-", qty: dcCableM, unit: "m", unitPriceVnd: unitPrices.dc_cable ?? 0 },
-      { id: "ac_cable", label: "Cáp AC", brandModel: "-", qty: acCableM, unit: "m", unitPriceVnd: unitPrices.ac_cable ?? 0 },
-      { id: "ac_dc_cabinet", label: "Tủ điện AC/DC", brandModel: "-", qty: 1, unit: "hệ", unitPriceVnd: unitPrices.ac_dc_cabinet ?? 0 },
-      { id: "labor", label: "Nhân công", brandModel: "-", qty: result.pvSizeKwp, unit: "kWp", unitPriceVnd: unitPrices.labor ?? 0 },
-      { id: "shipping", label: "Vận chuyển", brandModel: "-", qty: shippingTrips, unit: "chuyến", unitPriceVnd: unitPrices.shipping ?? 0 },
+      { id: "dc_cable", label: "Cáp DC", brandModel: "-", qty: dcCableM, unit: "m", unitPriceVnd: op.dcCablePerMeter },
+      { id: "ac_cable", label: "Cáp AC", brandModel: "-", qty: acCableM, unit: "m", unitPriceVnd: op.acCablePerMeter },
+      { id: "ac_dc_cabinet", label: "Tủ điện AC/DC", brandModel: "-", qty: 1, unit: "hệ", unitPriceVnd: op.acDcCabinetPrice },
+      { id: "labor", label: "Nhân công", brandModel: "-", qty: result.pvSizeKwp, unit: "kWp", unitPriceVnd: op.laborPerKwp },
+      { id: "shipping", label: "Vận chuyển", brandModel: "-", qty: shippingTrips, unit: "chuyến", unitPriceVnd: op.shippingPerTrip },
     );
     return list;
-  }, [equipment, selectedPanel, selectedInverter, selectedBattery, mountingType, result.pvSizeKwp, dcCableM, acCableM, shippingTrips, unitPrices]);
+  }, [equipment, selectedPanel, selectedInverter, selectedBattery, mountingType, result.pvSizeKwp, dcCableM, acCableM, shippingTrips, catalog.otherPricing]);
 
   const sub = subtotal(items);
   const totalPayment = totalAfterDiscount(sub, discountPercent);
@@ -308,10 +317,6 @@ export default function SolarCalculator() {
 
   const annualProductionKwh = systemType === "off_grid" ? monthlyKwh * 12 : monthlyKwh * 12 * (offsetPercent / 100);
   const carbon = calculateCarbon(annualProductionKwh, carbonPriceUsd, usdVndRate);
-
-  function setUnitPrice(id: string, value: number) {
-    setUnitPrices((prev) => ({ ...prev, [id]: value }));
-  }
 
   async function handleExport(kind: "png" | "pdf") {
     if (!reportRef.current) return;
@@ -737,11 +742,11 @@ export default function SolarCalculator() {
         <section className="mt-8">
           <h2 className="font-display text-lg font-semibold text-navy">Bảng kê vật tư &amp; báo giá</h2>
           <p className="mt-1 text-[13px] text-ink/55">
-            Giá tấm pin/inverter/pin lưu trữ lấy từ{" "}
+            Toàn bộ đơn giá được quản lý tại{" "}
             <a href="/admin" target="_blank" rel="noreferrer" className="text-solarblue underline-offset-2 hover:underline">
               bảng giá quản trị
             </a>
-            . Các hạng mục còn lại nhập tay theo báo giá thực tế.
+            . Chỉ cần nhập số lượng cáp/vận chuyển theo thực tế công trình, hệ thống tự tính thành tiền.
           </p>
           <div className="mt-3 overflow-x-auto rounded-2xl border border-line bg-white">
             <table className="w-full text-sm">
@@ -772,19 +777,7 @@ export default function SolarCalculator() {
                       {it.id !== "dc_cable" && it.id !== "ac_cable" && it.id !== "shipping" ? "" : ` ${it.unit}`}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {["panel", "inverter", "battery"].includes(it.id) ? (
-                        <span className="font-mono text-ink/70">{vnd(it.unitPriceVnd)}</span>
-                      ) : (
-                        <input
-                          type="number"
-                          min={0}
-                          step={1000}
-                          value={it.unitPriceVnd || ""}
-                          placeholder="0"
-                          onChange={(e) => setUnitPrice(it.id, Number(e.target.value) || 0)}
-                          className="w-28 rounded-md border border-line px-2.5 py-1.5 text-right font-mono"
-                        />
-                      )}
+                      <span className="font-mono text-ink/70">{vnd(it.unitPriceVnd)}</span>
                     </td>
                     <td className="px-4 py-3 text-right font-mono font-medium">{vnd(itemTotal(it))}</td>
                   </tr>

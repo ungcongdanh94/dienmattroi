@@ -21,10 +21,28 @@ export interface BatterySpec {
   priceVnd: number;
 }
 
+export interface OtherPricing {
+  /** đ/kWp — khung áp mái tôn/mái dốc */
+  framePerKwpApMai: number;
+  /** đ/kWp — khung giá đỡ nghiêng */
+  framePerKwpGiaDoNghieng: number;
+  /** đ/mét cáp DC */
+  dcCablePerMeter: number;
+  /** đ/mét cáp AC */
+  acCablePerMeter: number;
+  /** đ/hệ tủ điện AC/DC */
+  acDcCabinetPrice: number;
+  /** đ/kWp nhân công lắp đặt */
+  laborPerKwp: number;
+  /** đ/chuyến vận chuyển */
+  shippingPerTrip: number;
+}
+
 export interface EquipmentCatalog {
   panels: PanelSpec[];
   inverters: InverterSpec[];
   batteries: BatterySpec[];
+  otherPricing: OtherPricing;
 }
 
 export type MountingType = "ap_mai" | "gia_do_nghieng";

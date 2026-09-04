@@ -15,7 +15,13 @@ export async function PUT(req: Request) {
   }
 
   const body = await req.json().catch(() => null);
-  if (!body || !Array.isArray(body.panels) || !Array.isArray(body.inverters) || !Array.isArray(body.batteries)) {
+  if (
+    !body ||
+    !Array.isArray(body.panels) ||
+    !Array.isArray(body.inverters) ||
+    !Array.isArray(body.batteries) ||
+    typeof body.otherPricing !== "object"
+  ) {
     return NextResponse.json({ error: "Dữ liệu không hợp lệ" }, { status: 400 });
   }
 
