@@ -259,8 +259,6 @@ export default function SolarCalculator() {
     if (first) setBatteryId(first.id);
   }
 
-  const inverterMeetsRequirement = selectedInverter ? selectedInverter.capacityKw >= result.inverterSizeKw : false;
-
   const equipment = useMemo(
     () =>
       selectedPanel
@@ -767,10 +765,7 @@ export default function SolarCalculator() {
                 <select
                   value={inverterId}
                   onChange={(e) => setInverterId(e.target.value)}
-                  className={[
-                    "mt-2 w-full rounded-lg border px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2",
-                    inverterMeetsRequirement ? "border-line focus:border-navy focus:ring-navy/10" : "border-red-400 focus:border-red-500 focus:ring-red-100",
-                  ].join(" ")}
+                  className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
                 >
                   {invertersForBrand.length === 0 && <option value="">Không có model phù hợp</option>}
                   {invertersForBrand.map((inv) => (
@@ -818,19 +813,12 @@ export default function SolarCalculator() {
             </div>
           </div>
 
-          {!inverterMeetsRequirement && selectedInverter && (
-            <div className="mt-3 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-700">
-              <strong>Lỗi:</strong> Inverter {selectedInverter.brand} {selectedInverter.capacityKw}kW không đủ công suất —
-              hệ thống cần tối thiểu <strong>{result.inverterSizeKw} kW</strong>. Vui lòng chọn công suất lớn hơn.
-            </div>
-          )}
-
           {equipment && selectedPanel && selectedInverter && (
             <div className="mt-4 rounded-2xl border border-line bg-white p-5">
               <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-4">
                 <Row label={`Tấm pin (${equipment.panelAreaM2} m²/tấm)`} value={`${equipment.panelCount} tấm`} />
                 <Row label="Diện tích mái cần lắp" value={`${equipment.installedAreaM2} m²`} accent="#F4B63F" />
-                <Row label="Inverter" value={`${selectedInverter.capacityKw} kW · ${selectedInverter.phase === "1_pha" ? "1 pha" : "3 pha"}`} accent={inverterMeetsRequirement ? undefined : "#DC2626"} />
+                <Row label="Inverter" value={`${selectedInverter.capacityKw} kW · ${selectedInverter.phase === "1_pha" ? "1 pha" : "3 pha"}`} />
                 {equipment.batteryModuleCount !== null && <Row label="Pin lưu trữ" value={`${equipment.batteryModuleCount} module`} />}
               </div>
             </div>
