@@ -420,9 +420,53 @@ export default function SolarCalculator() {
   async function handleExport(kind: "png" | "pdf") {
     if (!reportRef.current) return;
     setExporting(kind);
+    let clone: HTMLElement | null = null;
     try {
       const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(reportRef.current, { backgroundColor: "#F7F8FA", scale: 2 });
+
+      // html2canvas hay cắt mất phần trên chữ bên trong <input>/<select>.
+      // Cách khắc phục chắc chắn nhất: chụp trên 1 bản sao DOM, trong đó thay
+      // input/select bằng <div> chứa đúng nội dung đang hiển thị (chữ thường).
+      const original = reportRef.current;
+      clone = original.cloneNode(true) as HTMLElement;
+      const originalFields = Array.from(original.querySelectorAll("input:not([type='checkbox']), select"));
+      const clonedFields = Array.from(clone.querySelectorAll("input:not([type='checkbox']), select"));
+
+      clonedFields.forEach((field, i) => {
+        const orig = originalFields[i] as HTMLInputElement | HTMLSelectElement | undefined;
+        if (!orig) return;
+        const div = document.createElement("div");
+        div.className = field.className;
+        div.style.display = "flex";
+        div.style.alignItems = "center";
+        div.style.overflow = "hidden";
+
+        let text = "";
+        let isPlaceholder = false;
+        if (orig.tagName === "SELECT") {
+          const sel = orig as HTMLSelectElement;
+          text = sel.options[sel.selectedIndex]?.text ?? "";
+        } else {
+          const inp = orig as HTMLInputElement;
+          text = inp.value;
+          if (!text && inp.placeholder) {
+            text = inp.placeholder;
+            isPlaceholder = true;
+          }
+        }
+        div.textContent = text;
+        if (isPlaceholder) div.style.color = "#9CA3AF";
+        field.replaceWith(div);
+      });
+
+      clone.style.position = "fixed";
+      clone.style.top = "0";
+      clone.style.left = "-99999px";
+      clone.style.width = `${original.offsetWidth}px`;
+      document.body.appendChild(clone);
+
+      const canvas = await html2canvas(clone, { backgroundColor: "#F7F8FA", scale: 2 });
+
       if (kind === "png") {
         const link = document.createElement("a");
         link.download = `bao-gia-${quoteCode}.png`;
@@ -455,6 +499,7 @@ export default function SolarCalculator() {
         }),
       }).catch(() => {});
     } finally {
+      if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
       setExporting(null);
     }
   }
@@ -736,7 +781,7 @@ export default function SolarCalculator() {
               )}
               {systemType === "hybrid" && (
                 <>
-                  <Slider label={`Số giờ backup: ${backupHours} giờ`} value={backupHours} min={1} max={12} onChange={setBackupHours} accent="#2F8F5B" />
+                  <Slider label={`Số giờ backup: ${backupHours} giờ`} value={backupHours} min={1} max={12} step={1} onChange={setBackupHours} accent="#2F8F5B" />
                   <Slider label={`Tải ban đêm cần backup: ${backupLoadPercent}%`} value={backupLoadPercent} min={10} max={100} step={5} onChange={setBackupLoadPercent} accent="#2F8F5B" />
                 </>
               )}
