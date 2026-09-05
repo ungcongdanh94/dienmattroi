@@ -560,34 +560,6 @@ export default function SolarCalculator() {
                 <Slider label={`Mức bù hoá đơn: ${offsetPercent}%`} value={offsetPercent} min={20} max={100} onChange={setOffsetPercent} accent="#E8A33D" className="mt-5" />
               )}
             </div>
-
-            {systemType !== "on_grid" && (
-              <div className="border-t border-line pt-6">
-                <h2 className="font-display text-[15px] font-semibold text-navy">Pin lưu trữ</h2>
-                <div className="mt-3 space-y-4 rounded-xl bg-surface p-4">
-                  <div>
-                    <Label>Loại pin</Label>
-                    <select
-                      value={batteryType}
-                      onChange={(e) => setBatteryType(e.target.value as BatteryType)}
-                      className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
-                    >
-                      <option value="lithium">Lithium (DoD 90%)</option>
-                      <option value="acid">Acid / chì (DoD 50%)</option>
-                    </select>
-                  </div>
-                  {systemType === "off_grid" && (
-                    <Slider label={`Số ngày tự trị: ${autonomyDays} ngày`} value={autonomyDays} min={0.5} max={3} step={0.5} onChange={setAutonomyDays} accent="#2F8F5B" />
-                  )}
-                  {systemType === "hybrid" && (
-                    <>
-                      <Slider label={`Số giờ backup: ${backupHours} giờ`} value={backupHours} min={1} max={12} onChange={setBackupHours} accent="#2F8F5B" />
-                      <Slider label={`Tải ban đêm cần backup: ${backupLoadPercent}%`} value={backupLoadPercent} min={10} max={100} step={5} onChange={setBackupLoadPercent} accent="#2F8F5B" />
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Right: sticky meter readout */}
@@ -655,6 +627,34 @@ export default function SolarCalculator() {
                 : `Đáng cân nhắc: ${SYSTEM_LABEL[result.recommendation.suggestedType].title}`}
             </div>
             <p className="mt-1 text-ink/70">{result.recommendation.message}</p>
+          </div>
+        )}
+
+        {systemType !== "on_grid" && (
+          <div className="mt-6 rounded-2xl border border-line bg-white p-6">
+            <h2 className="font-display text-[15px] font-semibold text-navy">Pin lưu trữ</h2>
+            <div className="mt-3 space-y-4 rounded-xl bg-surface p-4">
+              <div>
+                <Label>Loại pin</Label>
+                <select
+                  value={batteryType}
+                  onChange={(e) => setBatteryType(e.target.value as BatteryType)}
+                  className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
+                >
+                  <option value="lithium">Lithium (DoD 90%)</option>
+                  <option value="acid">Acid / chì (DoD 50%)</option>
+                </select>
+              </div>
+              {systemType === "off_grid" && (
+                <Slider label={`Số ngày tự trị: ${autonomyDays} ngày`} value={autonomyDays} min={0.5} max={3} step={0.5} onChange={setAutonomyDays} accent="#2F8F5B" />
+              )}
+              {systemType === "hybrid" && (
+                <>
+                  <Slider label={`Số giờ backup: ${backupHours} giờ`} value={backupHours} min={1} max={12} onChange={setBackupHours} accent="#2F8F5B" />
+                  <Slider label={`Tải ban đêm cần backup: ${backupLoadPercent}%`} value={backupLoadPercent} min={10} max={100} step={5} onChange={setBackupLoadPercent} accent="#2F8F5B" />
+                </>
+              )}
+            </div>
           </div>
         )}
 
