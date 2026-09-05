@@ -80,6 +80,7 @@ export default function SolarCalculator() {
   const [quoteCode] = useState(() => generateQuoteCode());
 
   const [inputMode, setInputMode] = useState<"kwh" | "bill">("bill");
+  const [autoSync, setAutoSync] = useState<boolean>(true);
   const [monthlyKwhRaw, setMonthlyKwhRaw] = useState<number>(600);
   const [monthlyBillVnd, setMonthlyBillVnd] = useState<number>(1500000);
   const [tariff, setTariff] = useState<EvnTariff>(EVN_TARIFF_2026);
@@ -159,14 +160,28 @@ export default function SolarCalculator() {
     return kwhForBillFlat(vndAmount, selectedVoltage, peakPercent, offPeakPercent, tariff.vatRate);
   }
 
-  const monthlyKwh = useMemo(
-    () => (inputMode === "kwh" ? monthlyKwhRaw : Math.round(kwhForBill(monthlyBillVnd) * 10) / 10),
-    [inputMode, monthlyKwhRaw, monthlyBillVnd, tariff, customerType, voltageIndex, peakPercent, offPeakPercent],
-  );
+  const monthlyKwh = useMemo(() => {
+    if (autoSync) return monthlyKwhRaw;
+    return inputMode === "kwh" ? monthlyKwhRaw : Math.round(kwhForBill(monthlyBillVnd) * 10) / 10;
+  }, [autoSync, inputMode, monthlyKwhRaw, monthlyBillVnd, tariff, customerType, voltageIndex, peakPercent, offPeakPercent]);
   const estimatedBillVnd = useMemo(
     () => Math.round(costForKwh(monthlyKwh)),
     [monthlyKwh, tariff, customerType, voltageIndex, peakPercent, offPeakPercent],
   );
+
+  useEffect(() => {
+    if (autoSync) setMonthlyKwhRaw(Math.round(kwhForBill(monthlyBillVnd) * 10) / 10);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tariff]);
+
+  function handleBillChange(v: number) {
+    setMonthlyBillVnd(v);
+    if (autoSync) setMonthlyKwhRaw(Math.round(kwhForBill(v) * 10) / 10);
+  }
+  function handleKwhChange(v: number) {
+    setMonthlyKwhRaw(v);
+    if (autoSync) setMonthlyBillVnd(Math.round(costForKwh(v)));
+  }
 
   async function refreshTariff() {
     setTariffStatus("loading");
@@ -493,8 +508,31 @@ export default function SolarCalculator() {
                       ))}
                     </select>
                   </div>
-                  <Slider label={`Giờ cao điểm: ${peakPercent}%`} value={peakPercent} min={0} max={100 - offPeakPercent} onChange={setPeakPercent} accent="#E8A33D" />
-                  <Slider label={`Giờ thấp điểm: ${offPeakPercent}%`} value={offPeakPercent} min={0} max={100 - peakPercent} onChange={setOffPeakPercent} accent="#2F8F5B" />
+                  <Slider
+                    label={`Giờ cao điểm: ${peakPercent}%`}
+                    value={peakPercent}
+                    min={0}
+                    max={100}
+                    onChange={(v) => setPeakPercent(Math.min(v, 100 - offPeakPercent))}
+                    accent="#E8A33D"
+                  />
+                  <Slider
+                    label={`Giờ thấp điểm: ${offPeakPercent}%`}
+                    value={offPeakPercent}
+                    min={0}
+                    max={100}
+                    onChange={(v) => setOffPeakPercent(Math.min(v, 100 - peakPercent))}
+                    accent="#2F8F5B"
+                  />
+                  <div className="flex items-center justify-between rounded-lg bg-white px-3.5 py-2.5 text-sm">
+                    <span className="text-ink/60">Giờ bình thường (còn lại)</span>
+                    <span className="font-mono font-medium text-navy">{Math.max(0, 100 - peakPercent - offPeakPercent)}%</span>
+                  </div>
+                  <p className="text-xs leading-relaxed text-ink/45">
+                    Khung giờ theo QĐ 963/QĐ-BCT (22/4/2026): <strong>Cao điểm</strong> 17h30–22h30 thứ 2 đến thứ 7 (Chủ nhật
+                    không có cao điểm) · <strong>Bình thường</strong> 06h00–17h30 và 22h30–24h00 (Chủ nhật 06h00–24h00) ·{" "}
+                    <strong>Thấp điểm</strong> 00h00–06h00 tất cả các ngày.
+                  </p>
                 </div>
               )}
             </div>
@@ -512,12 +550,12 @@ export default function SolarCalculator() {
                 </button>
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <ToggleButton active={inputMode === "bill"} onClick={() => setInputMode("bill")} label="Tiền điện (VNĐ)" />
-                <ToggleButton active={inputMode === "kwh"} onClick={() => setInputMode("kwh")} label="Số kWh" />
-              </div>
+              <label className="mt-3 flex items-center gap-2 text-[13px] text-ink/70">
+                <input type="checkbox" checked={autoSync} onChange={(e) => setAutoSync(e.target.checked)} className="h-4 w-4 rounded border-line accent-navy" />
+                Tự động tính qua lại giữa tiền điện và số kWh
+              </label>
 
-              {inputMode === "bill" ? (
+              {autoSync ? (
                 <>
                   <Label className="mt-4">Hoá đơn trung bình / tháng (đã gồm VAT)</Label>
                   <input
@@ -525,24 +563,54 @@ export default function SolarCalculator() {
                     min={0}
                     step={1000}
                     value={monthlyBillVnd}
-                    onChange={(e) => setMonthlyBillVnd(Number(e.target.value) || 0)}
+                    onChange={(e) => handleBillChange(Number(e.target.value) || 0)}
                     className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 font-mono text-lg focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
                   />
-                  <p className="mt-1.5 text-[13px] text-ink/50">
-                    ≈ <span className="font-mono text-ink/70">{monthlyKwh}</span> kWh/tháng · biểu giá hiệu lực từ {tariff.effectiveFrom}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <Label className="mt-4">Sản lượng trung bình / tháng</Label>
+                  <Label className="mt-4">Sản lượng trung bình / tháng (kWh)</Label>
                   <input
                     type="number"
                     min={0}
                     value={monthlyKwhRaw}
-                    onChange={(e) => setMonthlyKwhRaw(Number(e.target.value) || 0)}
+                    onChange={(e) => handleKwhChange(Number(e.target.value) || 0)}
                     className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 font-mono text-lg focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
                   />
-                  <p className="mt-1.5 text-[13px] text-ink/50">≈ <span className="font-mono text-ink/70">{vnd(estimatedBillVnd)}</span>/tháng</p>
+                  <p className="mt-1.5 text-[13px] text-ink/50">Biểu giá hiệu lực từ {tariff.effectiveFrom} · gõ vào 1 ô, ô còn lại tự cập nhật.</p>
+                </>
+              ) : (
+                <>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <ToggleButton active={inputMode === "bill"} onClick={() => setInputMode("bill")} label="Tiền điện (VNĐ)" />
+                    <ToggleButton active={inputMode === "kwh"} onClick={() => setInputMode("kwh")} label="Số kWh" />
+                  </div>
+
+                  {inputMode === "bill" ? (
+                    <>
+                      <Label className="mt-4">Hoá đơn trung bình / tháng (đã gồm VAT)</Label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1000}
+                        value={monthlyBillVnd}
+                        onChange={(e) => setMonthlyBillVnd(Number(e.target.value) || 0)}
+                        className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 font-mono text-lg focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
+                      />
+                      <p className="mt-1.5 text-[13px] text-ink/50">
+                        ≈ <span className="font-mono text-ink/70">{monthlyKwh}</span> kWh/tháng · biểu giá hiệu lực từ {tariff.effectiveFrom}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <Label className="mt-4">Sản lượng trung bình / tháng</Label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={monthlyKwhRaw}
+                        onChange={(e) => setMonthlyKwhRaw(Number(e.target.value) || 0)}
+                        className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 font-mono text-lg focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
+                      />
+                      <p className="mt-1.5 text-[13px] text-ink/50">≈ <span className="font-mono text-ink/70">{vnd(estimatedBillVnd)}</span>/tháng</p>
+                    </>
+                  )}
                 </>
               )}
 
