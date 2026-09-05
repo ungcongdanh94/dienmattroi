@@ -160,7 +160,7 @@ export default function AdminPage() {
     );
   }
   function addInverter() {
-    setCatalog((c) => (c ? { ...c, inverters: [...c.inverters, { id: `inv-${Date.now()}`, brand: "", phase: "1_pha", capacityKw: 0, priceVnd: 0 }] } : c));
+    setCatalog((c) => (c ? { ...c, inverters: [...c.inverters, { id: `inv-${Date.now()}`, brand: "", phase: "1_pha", kind: "hybrid", capacityKw: 0, priceVnd: 0 }] } : c));
   }
   function addBattery() {
     setCatalog((c) => (c ? { ...c, batteries: [...c.batteries, { id: `bat-${Date.now()}`, brand: "", moduleKwh: 0, priceVnd: 0 }] } : c));
@@ -227,6 +227,7 @@ export default function AdminPage() {
             <thead>
               <tr className="text-left text-[13px] text-ink/50">
                 <th className="px-3 py-2 font-medium">Thương hiệu</th>
+                <th className="px-3 py-2 font-medium">Loại</th>
                 <th className="px-3 py-2 font-medium">Số pha</th>
                 <th className="px-3 py-2 font-medium">Công suất (kW)</th>
                 <th className="px-3 py-2 text-right font-medium">Giá / bộ</th>
@@ -238,6 +239,17 @@ export default function AdminPage() {
                 <tr key={inv.id} className="border-t border-line/70">
                   <td className="px-3 py-2">
                     <input value={inv.brand} onChange={(e) => updateInverter(inv.id, { brand: e.target.value })} className="w-28 rounded-md border border-line px-2 py-1" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <select
+                      value={inv.kind}
+                      onChange={(e) => updateInverter(inv.id, { kind: e.target.value as InverterSpec["kind"] })}
+                      className="w-28 rounded-md border border-line px-2 py-1"
+                    >
+                      <option value="on_grid">Hoà lưới</option>
+                      <option value="hybrid">Hybrid</option>
+                      <option value="off_grid">Off-grid</option>
+                    </select>
                   </td>
                   <td className="px-3 py-2">
                     <select

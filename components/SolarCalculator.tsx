@@ -51,7 +51,7 @@ const SYSTEM_LABEL: Record<SystemType, { title: string; desc: string }> = {
 
 const FALLBACK_CATALOG: EquipmentCatalog = {
   panels: [{ id: "aiko-655", brand: "AIKO", wattage: 655, lengthMm: 2382, widthMm: 1134, priceVnd: 0 }],
-  inverters: [{ id: "solis-5", brand: "Solis", phase: "1_pha", capacityKw: 5, priceVnd: 0 }],
+  inverters: [{ id: "solis-5", brand: "Solis", phase: "1_pha", kind: "hybrid", capacityKw: 5, priceVnd: 0 }],
   batteries: [{ id: "dyness-14336", brand: "Dyness", moduleKwh: 14.336, priceVnd: 0 }],
   otherPricing: {
     framePerKwpApMai: 0,
@@ -198,11 +198,22 @@ export default function SolarCalculator() {
   );
 
   const panelBrands = useMemo(() => Array.from(new Set(catalog.panels.map((p) => p.brand))), [catalog]);
-  const inverterBrands = useMemo(() => Array.from(new Set(catalog.inverters.map((i) => i.brand))), [catalog]);
+  const invertersMatchingSystemType = useMemo(
+    () =>
+      catalog.inverters.filter((i) => {
+        if (systemType === "on_grid") return i.kind === "on_grid" || i.kind === "hybrid";
+        return i.kind === systemType;
+      }),
+    [catalog, systemType],
+  );
+  const inverterBrands = useMemo(
+    () => Array.from(new Set(invertersMatchingSystemType.map((i) => i.brand))),
+    [invertersMatchingSystemType],
+  );
   const batteryBrands = useMemo(() => Array.from(new Set(catalog.batteries.map((b) => b.brand))), [catalog]);
 
   const panelsForBrand = catalog.panels.filter((p) => p.brand === panelBrand);
-  const invertersForBrand = catalog.inverters.filter((i) => i.brand === inverterBrand && i.phase === inverterPhase);
+  const invertersForBrand = invertersMatchingSystemType.filter((i) => i.brand === inverterBrand && i.phase === inverterPhase);
   const batteriesForBrand = catalog.batteries.filter((b) => b.brand === batteryBrand);
 
   const selectedPanel: PanelSpec | undefined = panelsForBrand.find((p) => p.id === panelId) ?? panelsForBrand[0];
@@ -214,9 +225,24 @@ export default function SolarCalculator() {
     const first = catalog.panels.find((p) => p.brand === brand);
     if (first) setPanelId(first.id);
   }
+  useEffect(() => {
+    const stillValid = invertersMatchingSystemType.some(
+      (i) => i.brand === inverterBrand && i.phase === inverterPhase && i.id === inverterId,
+    );
+    if (!stillValid && invertersMatchingSystemType.length > 0) {
+      const first = invertersMatchingSystemType[0];
+      setInverterBrand(first.brand);
+      setInverterPhase(first.phase);
+      setInverterId(first.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [systemType, invertersMatchingSystemType]);
+
   function handleInverterBrandChange(brand: string) {
     setInverterBrand(brand);
-    const first = catalog.inverters.find((i) => i.brand === brand && i.phase === inverterPhase) ?? catalog.inverters.find((i) => i.brand === brand);
+    const first =
+      invertersMatchingSystemType.find((i) => i.brand === brand && i.phase === inverterPhase) ??
+      invertersMatchingSystemType.find((i) => i.brand === brand);
     if (first) {
       setInverterId(first.id);
       setInverterPhase(first.phase);
@@ -224,7 +250,7 @@ export default function SolarCalculator() {
   }
   function handleInverterPhaseChange(phase: "1_pha" | "3_pha") {
     setInverterPhase(phase);
-    const first = catalog.inverters.find((i) => i.brand === inverterBrand && i.phase === phase);
+    const first = invertersMatchingSystemType.find((i) => i.brand === inverterBrand && i.phase === phase);
     if (first) setInverterId(first.id);
   }
   function handleBatteryBrandChange(brand: string) {

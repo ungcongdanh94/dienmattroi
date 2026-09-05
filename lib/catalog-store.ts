@@ -22,16 +22,16 @@ const DEFAULT_CATALOG: EquipmentCatalog = {
     { id: "leapton-715", brand: "LEAPTON", wattage: 715, lengthMm: 2384, widthMm: 1303, priceVnd: 0 },
   ],
   inverters: [
-    { id: "solis-3", brand: "Solis", phase: "1_pha", capacityKw: 3, priceVnd: 0 },
-    { id: "solis-5", brand: "Solis", phase: "1_pha", capacityKw: 5, priceVnd: 0 },
-    { id: "solis-6", brand: "Solis", phase: "1_pha", capacityKw: 6, priceVnd: 0 },
-    { id: "solis-8", brand: "Solis", phase: "1_pha", capacityKw: 8, priceVnd: 0 },
-    { id: "solis-10", brand: "Solis", phase: "3_pha", capacityKw: 10, priceVnd: 0 },
-    { id: "sofar-3", brand: "Sofar", phase: "1_pha", capacityKw: 3, priceVnd: 0 },
-    { id: "sofar-5", brand: "Sofar", phase: "1_pha", capacityKw: 5, priceVnd: 0 },
-    { id: "sofar-6", brand: "Sofar", phase: "1_pha", capacityKw: 6, priceVnd: 0 },
-    { id: "sofar-8", brand: "Sofar", phase: "1_pha", capacityKw: 8, priceVnd: 0 },
-    { id: "sofar-10", brand: "Sofar", phase: "3_pha", capacityKw: 10, priceVnd: 0 },
+    { id: "solis-3", brand: "Solis", phase: "1_pha", kind: "hybrid", capacityKw: 3, priceVnd: 0 },
+    { id: "solis-5", brand: "Solis", phase: "1_pha", kind: "hybrid", capacityKw: 5, priceVnd: 0 },
+    { id: "solis-6", brand: "Solis", phase: "1_pha", kind: "hybrid", capacityKw: 6, priceVnd: 0 },
+    { id: "solis-8", brand: "Solis", phase: "1_pha", kind: "hybrid", capacityKw: 8, priceVnd: 0 },
+    { id: "solis-10", brand: "Solis", phase: "3_pha", kind: "hybrid", capacityKw: 10, priceVnd: 0 },
+    { id: "sofar-3", brand: "Sofar", phase: "1_pha", kind: "hybrid", capacityKw: 3, priceVnd: 0 },
+    { id: "sofar-5", brand: "Sofar", phase: "1_pha", kind: "hybrid", capacityKw: 5, priceVnd: 0 },
+    { id: "sofar-6", brand: "Sofar", phase: "1_pha", kind: "hybrid", capacityKw: 6, priceVnd: 0 },
+    { id: "sofar-8", brand: "Sofar", phase: "1_pha", kind: "hybrid", capacityKw: 8, priceVnd: 0 },
+    { id: "sofar-10", brand: "Sofar", phase: "3_pha", kind: "hybrid", capacityKw: 10, priceVnd: 0 },
   ],
   batteries: [
     { id: "dyness-14336", brand: "Dyness", moduleKwh: 14.336, priceVnd: 0 },
@@ -68,7 +68,7 @@ export function getCatalog(): EquipmentCatalog {
     const merged: EquipmentCatalog = {
       panels: parsed.panels?.length ? parsed.panels : DEFAULT_CATALOG.panels,
       inverters: parsed.inverters?.length
-        ? parsed.inverters.map((inv) => ({ ...inv, phase: inv.phase ?? "1_pha" }))
+        ? parsed.inverters.map((inv) => ({ ...inv, phase: inv.phase ?? "1_pha", kind: inv.kind ?? "hybrid" }))
         : DEFAULT_CATALOG.inverters,
       batteries: parsed.batteries?.length ? parsed.batteries : DEFAULT_CATALOG.batteries,
       otherPricing: { ...DEFAULT_CATALOG.otherPricing, ...(parsed.otherPricing ?? {}) },

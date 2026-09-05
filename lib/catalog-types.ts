@@ -9,10 +9,14 @@ export interface PanelSpec {
 
 export type Phase = "1_pha" | "3_pha";
 
+/** Loại inverter theo cách hệ thống hoạt động — khớp với SystemType ở lib/solar-calculator.ts */
+export type InverterKind = "on_grid" | "hybrid" | "off_grid";
+
 export interface InverterSpec {
   id: string;
   brand: string;
   phase: Phase;
+  kind: InverterKind;
   capacityKw: number;
   priceVnd: number;
 }
