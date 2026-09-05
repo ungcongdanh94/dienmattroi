@@ -159,12 +159,33 @@ export default function AdminPage() {
       c ? { ...c, panels: [...c.panels, { id: `panel-${Date.now()}`, brand: "", wattage: 0, lengthMm: 0, widthMm: 0, priceVnd: 0 }] } : c,
     );
   }
-  function addInverter() {
-    setCatalog((c) => (c ? { ...c, inverters: [...c.inverters, { id: `inv-${Date.now()}`, brand: "", phase: "1_pha", kind: "hybrid", capacityKw: 0, priceVnd: 0 }] } : c));
+  function addInverterToBrand(brand: string) {
+    setCatalog((c) =>
+      c ? { ...c, inverters: [...c.inverters, { id: `inv-${Date.now()}`, brand, phase: "1_pha", kind: "hybrid", capacityKw: 0, priceVnd: 0 }] } : c,
+    );
+  }
+  function renameInverterBrand(oldBrand: string, newBrand: string) {
+    setCatalog((c) => (c ? { ...c, inverters: c.inverters.map((i) => (i.brand === oldBrand ? { ...i, brand: newBrand } : i)) } : c));
+  }
+  function removeInverterBrand(brand: string) {
+    setCatalog((c) => (c ? { ...c, inverters: c.inverters.filter((i) => i.brand !== brand) } : c));
+  }
+  function addNewInverterBrand() {
+    const name = window.prompt("Tên thương hiệu inverter mới:");
+    if (name && name.trim()) addInverterToBrand(name.trim());
   }
   function addBattery() {
     setCatalog((c) => (c ? { ...c, batteries: [...c.batteries, { id: `bat-${Date.now()}`, brand: "", moduleKwh: 0, priceVnd: 0 }] } : c));
   }
+
+  const inverterBrandOrder: string[] = [];
+  for (const inv of catalog.inverters) {
+    if (!inverterBrandOrder.includes(inv.brand)) inverterBrandOrder.push(inv.brand);
+  }
+  const inverterGroups = inverterBrandOrder.map((brand) => ({
+    brand,
+    items: catalog.inverters.filter((i) => i.brand === brand),
+  }));
 
   return (
     <div className="min-h-screen bg-surface px-4 py-10 sm:px-6 lg:px-8">
@@ -222,61 +243,86 @@ export default function AdminPage() {
         </CatalogSection>
 
         {/* Inverters */}
-        <CatalogSection title="Inverter" onAdd={addInverter}>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-[13px] text-ink/50">
-                <th className="px-3 py-2 font-medium">Thương hiệu</th>
-                <th className="px-3 py-2 font-medium">Loại</th>
-                <th className="px-3 py-2 font-medium">Số pha</th>
-                <th className="px-3 py-2 font-medium">Công suất (kW)</th>
-                <th className="px-3 py-2 text-right font-medium">Giá / bộ</th>
-                <th className="px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {catalog.inverters.map((inv) => (
-                <tr key={inv.id} className="border-t border-line/70">
-                  <td className="px-3 py-2">
-                    <input value={inv.brand} onChange={(e) => updateInverter(inv.id, { brand: e.target.value })} className="w-28 rounded-md border border-line px-2 py-1" />
-                  </td>
-                  <td className="px-3 py-2">
-                    <select
-                      value={inv.kind}
-                      onChange={(e) => updateInverter(inv.id, { kind: e.target.value as InverterSpec["kind"] })}
-                      className="w-28 rounded-md border border-line px-2 py-1"
-                    >
-                      <option value="on_grid">Hoà lưới</option>
-                      <option value="hybrid">Hybrid</option>
-                      <option value="off_grid">Off-grid</option>
-                    </select>
-                  </td>
-                  <td className="px-3 py-2">
-                    <select
-                      value={inv.phase}
-                      onChange={(e) => updateInverter(inv.id, { phase: e.target.value as InverterSpec["phase"] })}
-                      className="w-24 rounded-md border border-line px-2 py-1"
-                    >
-                      <option value="1_pha">1 pha</option>
-                      <option value="3_pha">3 pha</option>
-                    </select>
-                  </td>
-                  <td className="px-3 py-2">
-                    <input type="number" value={inv.capacityKw} onChange={(e) => updateInverter(inv.id, { capacityKw: Number(e.target.value) || 0 })} className="w-24 rounded-md border border-line px-2 py-1 font-mono" />
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <input type="number" value={inv.priceVnd} onChange={(e) => updateInverter(inv.id, { priceVnd: Number(e.target.value) || 0 })} className="w-28 rounded-md border border-line px-2 py-1 text-right font-mono" />
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <button type="button" onClick={() => removeRow("inverters", inv.id)} className="text-xs text-red-500 hover:underline">
-                      Xoá
+        <div className="mt-6 rounded-2xl border border-line bg-white">
+          <div className="flex items-center justify-between border-b border-line px-5 py-3">
+            <h2 className="font-display font-semibold text-navy">Inverter</h2>
+            <button type="button" onClick={addNewInverterBrand} className="text-sm font-medium text-solarblue hover:underline">
+              + Thêm thương hiệu
+            </button>
+          </div>
+
+          <div className="divide-y divide-line">
+            {inverterGroups.map((group) => (
+              <div key={group.brand} className="p-5">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <input
+                    value={group.brand}
+                    onChange={(e) => renameInverterBrand(group.brand, e.target.value)}
+                    className="w-48 rounded-md border border-line px-2.5 py-1.5 font-display font-semibold text-navy"
+                  />
+                  <div className="flex items-center gap-3">
+                    <button type="button" onClick={() => addInverterToBrand(group.brand)} className="text-xs font-medium text-solarblue hover:underline">
+                      + Thêm công suất
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </CatalogSection>
+                    <button type="button" onClick={() => removeInverterBrand(group.brand)} className="text-xs text-red-500 hover:underline">
+                      Xoá cả thương hiệu
+                    </button>
+                  </div>
+                </div>
+
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[13px] text-ink/50">
+                      <th className="py-1.5 font-medium">Loại</th>
+                      <th className="py-1.5 font-medium">Số pha</th>
+                      <th className="py-1.5 font-medium">Công suất (kW)</th>
+                      <th className="py-1.5 text-right font-medium">Giá / bộ</th>
+                      <th className="py-1.5" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.items.map((inv) => (
+                      <tr key={inv.id} className="border-t border-line/70">
+                        <td className="py-2 pr-2">
+                          <select
+                            value={inv.kind}
+                            onChange={(e) => updateInverter(inv.id, { kind: e.target.value as InverterSpec["kind"] })}
+                            className="w-28 rounded-md border border-line px-2 py-1"
+                          >
+                            <option value="on_grid">Hoà lưới</option>
+                            <option value="hybrid">Hybrid</option>
+                            <option value="off_grid">Off-grid</option>
+                          </select>
+                        </td>
+                        <td className="py-2 pr-2">
+                          <select
+                            value={inv.phase}
+                            onChange={(e) => updateInverter(inv.id, { phase: e.target.value as InverterSpec["phase"] })}
+                            className="w-24 rounded-md border border-line px-2 py-1"
+                          >
+                            <option value="1_pha">1 pha</option>
+                            <option value="3_pha">3 pha</option>
+                          </select>
+                        </td>
+                        <td className="py-2 pr-2">
+                          <input type="number" value={inv.capacityKw} onChange={(e) => updateInverter(inv.id, { capacityKw: Number(e.target.value) || 0 })} className="w-24 rounded-md border border-line px-2 py-1 font-mono" />
+                        </td>
+                        <td className="py-2 pr-2 text-right">
+                          <input type="number" value={inv.priceVnd} onChange={(e) => updateInverter(inv.id, { priceVnd: Number(e.target.value) || 0 })} className="w-28 rounded-md border border-line px-2 py-1 text-right font-mono" />
+                        </td>
+                        <td className="py-2 text-right">
+                          <button type="button" onClick={() => removeRow("inverters", inv.id)} className="text-xs text-red-500 hover:underline">
+                            Xoá
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* Batteries */}
         <CatalogSection title="Pin lưu trữ" onAdd={addBattery}>
