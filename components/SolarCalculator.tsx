@@ -455,45 +455,6 @@ export default function SolarCalculator() {
           </div>
         </section>
 
-        {/* System type */}
-        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {(Object.keys(SYSTEM_LABEL) as SystemType[]).map((key) => {
-            const active = systemType === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setSystemType(key)}
-                className={[
-                  "rounded-xl border px-4 py-3 text-left transition-colors",
-                  active ? "border-navy bg-navy text-white" : "border-line bg-white text-ink hover:border-navy/40",
-                ].join(" ")}
-              >
-                <div className="font-display text-[15px] font-semibold">{SYSTEM_LABEL[key].title}</div>
-                <div className={["mt-0.5 text-[13px]", active ? "text-white/70" : "text-ink/55"].join(" ")}>
-                  {SYSTEM_LABEL[key].desc}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {result.recommendation.suggestedType && (
-          <div
-            className={[
-              "mb-8 rounded-xl border p-4 text-sm",
-              result.recommendation.matchesSelection ? "border-energy/30 bg-energy/[0.06]" : "border-gold/40 bg-gold/[0.08]",
-            ].join(" ")}
-          >
-            <div className="font-medium text-ink">
-              {result.recommendation.matchesSelection
-                ? "Lựa chọn phù hợp"
-                : `Đáng cân nhắc: ${SYSTEM_LABEL[result.recommendation.suggestedType].title}`}
-            </div>
-            <p className="mt-1 text-ink/70">{result.recommendation.message}</p>
-          </div>
-        )}
-
         {/* Form + sticky meter */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
           {/* Left: inputs */}
@@ -657,6 +618,45 @@ export default function SolarCalculator() {
             </div>
           </div>
         </div>
+
+        {/* System type */}
+        <div className="mt-8 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {(Object.keys(SYSTEM_LABEL) as SystemType[]).map((key) => {
+            const active = systemType === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setSystemType(key)}
+                className={[
+                  "rounded-xl border px-4 py-3 text-left transition-colors",
+                  active ? "border-navy bg-navy text-white" : "border-line bg-white text-ink hover:border-navy/40",
+                ].join(" ")}
+              >
+                <div className="font-display text-[15px] font-semibold">{SYSTEM_LABEL[key].title}</div>
+                <div className={["mt-0.5 text-[13px]", active ? "text-white/70" : "text-ink/55"].join(" ")}>
+                  {SYSTEM_LABEL[key].desc}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {result.recommendation.suggestedType && (
+          <div
+            className={[
+              "mt-3 rounded-xl border p-4 text-sm",
+              result.recommendation.matchesSelection ? "border-energy/30 bg-energy/[0.06]" : "border-gold/40 bg-gold/[0.08]",
+            ].join(" ")}
+          >
+            <div className="font-medium text-ink">
+              {result.recommendation.matchesSelection
+                ? "Lựa chọn phù hợp"
+                : `Đáng cân nhắc: ${SYSTEM_LABEL[result.recommendation.suggestedType].title}`}
+            </div>
+            <p className="mt-1 text-ink/70">{result.recommendation.message}</p>
+          </div>
+        )}
 
         {/* Equipment advisory */}
         <section className="mt-8">
