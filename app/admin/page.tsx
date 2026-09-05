@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { EquipmentCatalog, PanelSpec, InverterSpec, BatterySpec } from "@/lib/catalog-types";
 import type { ProjectEntry } from "@/lib/projects-store";
+import type { QuoteRecord } from "@/lib/quotes-store";
 
 export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -13,6 +14,7 @@ export default function AdminPage() {
   const [projects, setProjects] = useState<ProjectEntry[] | null>(null);
   const [projectSaveStatus, setProjectSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [quotes, setQuotes] = useState<QuoteRecord[] | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/session")
@@ -28,6 +30,9 @@ export default function AdminPage() {
       fetch("/api/projects")
         .then((r) => r.json())
         .then(setProjects);
+      fetch("/api/quotes")
+        .then((r) => r.json())
+        .then(setQuotes);
     }
   }, [authenticated]);
 
@@ -438,6 +443,50 @@ export default function AdminPage() {
                   ? "Lỗi, thử lại"
                   : "Lưu dự án"}
           </button>
+        </div>
+
+        {/* Quote history */}
+        <div className="mt-10 rounded-2xl border border-line bg-white">
+          <div className="border-b border-line px-5 py-3">
+            <h2 className="font-display text-lg font-semibold text-navy">Lịch sử báo giá đã xuất</h2>
+            <p className="mt-1 text-xs text-ink/50">Tự động lưu mỗi khi khách/sale bấm Xuất PNG hoặc PDF ở trang tính toán.</p>
+          </div>
+          {!quotes ? (
+            <div className="p-5 text-sm text-ink/50">Đang tải…</div>
+          ) : quotes.length === 0 ? (
+            <div className="p-5 text-sm text-ink/50">Chưa có báo giá nào được xuất.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[13px] text-ink/50">
+                    <th className="px-5 py-2.5 font-medium">Thời gian</th>
+                    <th className="px-5 py-2.5 font-medium">Mã báo giá</th>
+                    <th className="px-5 py-2.5 font-medium">Khách hàng</th>
+                    <th className="px-5 py-2.5 font-medium">SĐT</th>
+                    <th className="px-5 py-2.5 font-medium">Hệ thống</th>
+                    <th className="px-5 py-2.5 text-right font-medium">Công suất</th>
+                    <th className="px-5 py-2.5 text-right font-medium">Tổng tiền</th>
+                    <th className="px-5 py-2.5 font-medium">Xuất</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {quotes.map((q) => (
+                    <tr key={q.id} className="border-t border-line/70">
+                      <td className="px-5 py-2.5 text-ink/60">{new Date(q.createdAt).toLocaleString("vi-VN")}</td>
+                      <td className="px-5 py-2.5 font-mono text-xs">{q.quoteCode}</td>
+                      <td className="px-5 py-2.5">{q.customerName || "—"}</td>
+                      <td className="px-5 py-2.5">{q.customerPhone || "—"}</td>
+                      <td className="px-5 py-2.5">{q.systemType}</td>
+                      <td className="px-5 py-2.5 text-right font-mono">{q.pvSizeKwp} kWp</td>
+                      <td className="px-5 py-2.5 text-right font-mono">{q.totalPaymentVnd.toLocaleString("vi-VN")} đ</td>
+                      <td className="px-5 py-2.5 uppercase text-ink/50">{q.exportKind}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>

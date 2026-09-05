@@ -77,8 +77,6 @@ export default function SolarCalculator() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [siteAddress, setSiteAddress] = useState("");
-  const [saleName, setSaleName] = useState("");
-  const [salePhone, setSalePhone] = useState("");
   const [quoteCode] = useState(() => generateQuoteCode());
 
   const [inputMode, setInputMode] = useState<"kwh" | "bill">("bill");
@@ -377,6 +375,25 @@ export default function SolarCalculator() {
         pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
         pdf.save(`bao-gia-${quoteCode}.pdf`);
       }
+
+      // Lưu lại báo giá này vào hệ thống (xem được trong /admin)
+      fetch("/api/quotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quoteCode,
+          customerName,
+          customerPhone,
+          siteAddress,
+          systemType,
+          pvSizeKwp: result.pvSizeKwp,
+          panelBrand: selectedPanel?.brand ?? "",
+          inverterBrand: selectedInverter?.brand ?? "",
+          batteryBrand: selectedBattery?.brand ?? null,
+          totalPaymentVnd: totalPayment,
+          exportKind: kind,
+        }),
+      }).catch(() => {});
     } finally {
       setExporting(null);
     }
@@ -398,16 +415,12 @@ export default function SolarCalculator() {
           </div>
         </header>
 
-        {/* Customer & sale info */}
+        {/* Customer info */}
         <section className="mb-8 rounded-2xl border border-line bg-white p-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Tên khách hàng" value={customerName} onChange={setCustomerName} placeholder="Anh/Chị Khách Hàng" />
             <Field label="Số điện thoại khách" value={customerPhone} onChange={setCustomerPhone} placeholder="09xx xxx xxx" />
             <Field label="Địa chỉ công trình" value={siteAddress} onChange={setSiteAddress} placeholder="Long Xuyên, An Giang" />
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="Tên nhân viên sale" value={saleName} onChange={setSaleName} placeholder="Tên bạn" />
-              <Field label="SĐT sale" value={salePhone} onChange={setSalePhone} placeholder="09xx xxx xxx" />
-            </div>
           </div>
         </section>
 
