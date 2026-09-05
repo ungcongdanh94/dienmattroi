@@ -174,6 +174,20 @@ export default function SolarCalculator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tariff]);
 
+  function handleNormalPercentChange(normal: number) {
+    const remaining = 100 - normal;
+    const currentSum = peakPercent + offPeakPercent;
+    let newPeak: number;
+    if (currentSum <= 0) {
+      newPeak = Math.round(remaining / 2);
+    } else {
+      newPeak = Math.round((remaining * peakPercent) / currentSum);
+    }
+    const newOffPeak = remaining - newPeak;
+    setPeakPercent(Math.max(0, newPeak));
+    setOffPeakPercent(Math.max(0, newOffPeak));
+  }
+
   function handleBillChange(v: number) {
     setMonthlyBillVnd(v);
     if (autoSync) setMonthlyKwhRaw(Math.round(kwhForBill(v) * 10) / 10);
@@ -524,10 +538,14 @@ export default function SolarCalculator() {
                     onChange={(v) => setOffPeakPercent(Math.min(v, 100 - peakPercent))}
                     accent="#2F8F5B"
                   />
-                  <div className="flex items-center justify-between rounded-lg bg-white px-3.5 py-2.5 text-sm">
-                    <span className="text-ink/60">Giờ bình thường (còn lại)</span>
-                    <span className="font-mono font-medium text-navy">{Math.max(0, 100 - peakPercent - offPeakPercent)}%</span>
-                  </div>
+                  <Slider
+                    label={`Giờ bình thường: ${Math.max(0, 100 - peakPercent - offPeakPercent)}%`}
+                    value={Math.max(0, 100 - peakPercent - offPeakPercent)}
+                    min={0}
+                    max={100}
+                    onChange={handleNormalPercentChange}
+                    accent="#1769AA"
+                  />
                   <p className="text-xs leading-relaxed text-ink/45">
                     Khung giờ theo QĐ 963/QĐ-BCT (22/4/2026): <strong>Cao điểm</strong> 17h30–22h30 thứ 2 đến thứ 7 (Chủ nhật
                     không có cao điểm) · <strong>Bình thường</strong> 06h00–17h30 và 22h30–24h00 (Chủ nhật 06h00–24h00) ·{" "}
