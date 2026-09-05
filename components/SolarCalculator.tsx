@@ -130,6 +130,8 @@ export default function SolarCalculator() {
   }, []);
 
   const [shippingTrips, setShippingTrips] = useState<number>(1);
+  const [dcCableM, setDcCableM] = useState<number>(0);
+  const [acCableM, setAcCableM] = useState<number>(0);
   const [discountPercent, setDiscountPercent] = useState<number>(0);
 
   const [loanPercent, setLoanPercent] = useState<number>(70);
@@ -247,12 +249,19 @@ export default function SolarCalculator() {
     [selectedPanel, selectedBattery, result, mountingType],
   );
 
+  // Công suất THỰC LẮP (số tấm × công suất/tấm) — dùng cho khung/cáp/tủ điện/nhân công,
+  // vì thường lớn hơn công suất yêu cầu (result.pvSizeKwp) do làm tròn số tấm lên.
+  const actualCapacityKwp = selectedPanel && equipment ? (equipment.panelCount * selectedPanel.wattage) / 1000 : 0;
+
+  useEffect(() => {
+    if (!actualCapacityKwp) return;
+    setDcCableM(Math.max(1, Math.round(actualCapacityKwp * catalog.otherPricing.dcCableMetersPerKwp)));
+    setAcCableM(Math.max(1, Math.round(actualCapacityKwp * catalog.otherPricing.acCableMetersPerKwp)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actualCapacityKwp, catalog.otherPricing.dcCableMetersPerKwp, catalog.otherPricing.acCableMetersPerKwp]);
+
   const items: QuoteItem[] = useMemo(() => {
     if (!selectedPanel || !selectedInverter || !equipment) return [];
-
-    // Công suất THỰC LẮP (số tấm × công suất/tấm) — dùng cho khung/cáp/tủ điện/nhân công,
-    // vì thường lớn hơn công suất yêu cầu (result.pvSizeKwp) do làm tròn số tấm lên.
-    const actualCapacityKwp = (equipment.panelCount * selectedPanel.wattage) / 1000;
 
     const list: QuoteItem[] = [
       {
@@ -283,8 +292,6 @@ export default function SolarCalculator() {
       });
     }
     const op = catalog.otherPricing;
-    const dcCableM = Math.max(1, Math.round(actualCapacityKwp * op.dcCableMetersPerKwp));
-    const acCableM = Math.max(1, Math.round(actualCapacityKwp * op.acCableMetersPerKwp));
     list.push(
       {
         id: "frame",
@@ -312,7 +319,7 @@ export default function SolarCalculator() {
       { id: "shipping", label: "Vận chuyển", brandModel: "-", qty: shippingTrips, unit: "chuyến", unitPriceVnd: op.shippingPerTrip },
     );
     return list;
-  }, [equipment, selectedPanel, selectedInverter, selectedBattery, mountingType, shippingTrips, catalog.otherPricing]);
+  }, [equipment, selectedPanel, selectedInverter, selectedBattery, mountingType, shippingTrips, dcCableM, acCableM, catalog.otherPricing]);
 
   const sub = subtotal(items);
   const totalPayment = totalAfterDiscount(sub, discountPercent);
@@ -824,7 +831,7 @@ export default function SolarCalculator() {
             <a href="/admin" target="_blank" rel="noreferrer" className="text-solarblue underline-offset-2 hover:underline">
               bảng giá quản trị
             </a>
-            . Số mét cáp DC/AC tự tính theo mức phổ biến (dự toán).
+            . Số mét cáp DC/AC là <strong>dự toán ban đầu</strong> (gợi ý sẵn theo mức phổ biến, có thể sửa tay) — sẽ khảo sát thực tế và báo lại chính xác sau.
           </p>
 
           {customerView ? (
@@ -866,8 +873,14 @@ export default function SolarCalculator() {
                         <>
                           <input type="number" min={0} value={shippingTrips} onChange={(e) => setShippingTrips(Number(e.target.value) || 0)} className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono" /> {it.unit}
                         </>
-                      ) : it.id === "dc_cable" || it.id === "ac_cable" ? (
-                        `${it.qty} ${it.unit}`
+                      ) : it.id === "dc_cable" ? (
+                        <>
+                          <input type="number" min={0} value={dcCableM} onChange={(e) => setDcCableM(Number(e.target.value) || 0)} className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono" /> {it.unit}
+                        </>
+                      ) : it.id === "ac_cable" ? (
+                        <>
+                          <input type="number" min={0} value={acCableM} onChange={(e) => setAcCableM(Number(e.target.value) || 0)} className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono" /> {it.unit}
+                        </>
                       ) : (
                         `${it.qty}${it.unit === "kWp" ? " kWp" : ""}`
                       )}
