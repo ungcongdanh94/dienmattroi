@@ -1091,13 +1091,14 @@ export default function SolarCalculator() {
                 <input type="number" min={1} max={30} value={depreciationYears} onChange={(e) => setDepreciationYears(Number(e.target.value) || 1)} className="w-14 rounded-md border border-line px-2 py-1 text-right font-mono" />
               </div>
             </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[13px] text-ink/50">
-                  <th className="px-5 py-2.5 font-medium">Hạng mục</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Nguyên giá</th>
-                  <th className="px-5 py-2.5 text-right font-medium">KH/năm</th>
-                  <th className="px-5 py-2.5 text-right font-medium">KH/tháng</th>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[480px] text-sm">
+                <thead>
+                  <tr className="text-left text-[13px] text-ink/50">
+                    <th className="px-5 py-2.5 font-medium">Hạng mục</th>
+                    <th className="px-5 py-2.5 text-right font-medium">Nguyên giá</th>
+                    <th className="px-5 py-2.5 text-right font-medium">KH/năm</th>
+                    <th className="px-5 py-2.5 text-right font-medium">KH/tháng</th>
                 </tr>
               </thead>
               <tbody>
@@ -1114,8 +1115,9 @@ export default function SolarCalculator() {
                   <td className="px-5 py-2.5 text-right font-mono">{vnd(totalDepreciationPerYear)}</td>
                   <td className="px-5 py-2.5 text-right font-mono">{vnd(totalDepreciationPerMonth)}</td>
                 </tr>
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
             <p className="px-5 pb-4 pt-2 text-xs text-ink/40">Khấu hao đường thẳng, giá trị thanh lý = 0. Chỉ tham khảo kế toán nội bộ.</p>
           </div>
 
@@ -1149,26 +1151,28 @@ export default function SolarCalculator() {
                 <span>%/năm</span>
               </div>
             </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[13px] text-ink/50">
-                  <th className="px-5 py-2.5 font-medium">Năm</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Giá TB (đ/kWh)</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Tiết kiệm/năm</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Luỹ kế</th>
-                </tr>
-              </thead>
-              <tbody>
-                {projection10Y.map((r) => (
-                  <tr key={r.year} className="border-t border-line/70">
-                    <td className="px-5 py-2.5">Năm {r.year}</td>
-                    <td className="px-5 py-2.5 text-right font-mono">{r.avgPriceVndPerKwh.toLocaleString("vi-VN")}</td>
-                    <td className="px-5 py-2.5 text-right font-mono text-energy">{vnd(r.savingsThisYearVnd)}</td>
-                    <td className="px-5 py-2.5 text-right font-mono font-medium">{vnd(r.cumulativeSavingsVnd)}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[480px] text-sm">
+                <thead>
+                  <tr className="text-left text-[13px] text-ink/50">
+                    <th className="px-5 py-2.5 font-medium">Năm</th>
+                    <th className="px-5 py-2.5 text-right font-medium">Giá TB (đ/kWh)</th>
+                    <th className="px-5 py-2.5 text-right font-medium">Tiết kiệm/năm</th>
+                    <th className="px-5 py-2.5 text-right font-medium">Luỹ kế</th>
                   </tr>
+                </thead>
+                <tbody>
+                  {projection10Y.map((r) => (
+                    <tr key={r.year} className="border-t border-line/70">
+                      <td className="px-5 py-2.5">Năm {r.year}</td>
+                      <td className="px-5 py-2.5 text-right font-mono">{r.avgPriceVndPerKwh.toLocaleString("vi-VN")}</td>
+                      <td className="px-5 py-2.5 text-right font-mono text-energy">{vnd(r.savingsThisYearVnd)}</td>
+                      <td className="px-5 py-2.5 text-right font-mono font-medium">{vnd(r.cumulativeSavingsVnd)}</td>
+                    </tr>
                 ))}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">

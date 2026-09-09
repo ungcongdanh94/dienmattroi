@@ -11,7 +11,7 @@ export default function Hero() {
       <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-14 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-gold">Giải pháp năng lượng thông minh</p>
-          <h1 className="font-display mt-4 text-[40px] font-semibold leading-[1.08] text-white sm:text-5xl lg:text-[56px]">
+          <h1 className="font-display mt-4 text-[34px] font-semibold leading-[1.12] text-white sm:text-5xl lg:text-[56px]">
             Tối ưu chi phí,
             <br />
             chủ động năng lượng
@@ -50,14 +50,14 @@ export default function Hero() {
             />
           </div>
 
-          <div className="absolute -bottom-6 -left-6 rounded-2xl border border-line bg-white p-4 shadow-xl sm:-left-10">
+          <div className="absolute -bottom-4 -left-2 rounded-2xl border border-line bg-white p-3 shadow-xl sm:-bottom-6 sm:-left-10 sm:p-4">
             <div className="text-xs text-ink/50">Công suất</div>
-            <div className="font-mono text-2xl font-semibold text-navy">10.2 kWp</div>
+            <div className="font-mono text-xl font-semibold text-navy sm:text-2xl">10.2 kWp</div>
           </div>
 
-          <div className="absolute -right-2 -top-6 rounded-2xl border border-line bg-white p-4 shadow-xl sm:-right-8">
+          <div className="absolute -right-2 -top-4 rounded-2xl border border-line bg-white p-3 shadow-xl sm:-right-8 sm:-top-6 sm:p-4">
             <div className="text-xs text-ink/50">Tiết kiệm dự kiến</div>
-            <div className="font-mono text-2xl font-semibold text-energy">~8.3 triệu/tháng</div>
+            <div className="font-mono text-xl font-semibold text-energy sm:text-2xl">~8.3 triệu/tháng</div>
           </div>
         </div>
       </div>

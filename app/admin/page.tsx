@@ -254,11 +254,11 @@ export default function AdminPage() {
           <div className="divide-y divide-line">
             {inverterGroups.map((group) => (
               <div key={group.brand} className="p-5">
-                <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <input
                     value={group.brand}
                     onChange={(e) => renameInverterBrand(group.brand, e.target.value)}
-                    className="w-48 rounded-md border border-line px-2.5 py-1.5 font-display font-semibold text-navy"
+                    className="w-full rounded-md border border-line px-2.5 py-1.5 font-display font-semibold text-navy sm:w-48"
                   />
                   <div className="flex items-center gap-3">
                     <button type="button" onClick={() => addInverterToBrand(group.brand)} className="text-xs font-medium text-solarblue hover:underline">
@@ -270,12 +270,13 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-[13px] text-ink/50">
-                      <th className="py-1.5 font-medium">Loại</th>
-                      <th className="py-1.5 font-medium">Số pha</th>
-                      <th className="py-1.5 font-medium">Công suất (kW)</th>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[560px]">
+                    <thead>
+                      <tr className="text-left text-[13px] text-ink/50">
+                        <th className="py-1.5 font-medium">Loại</th>
+                        <th className="py-1.5 font-medium">Số pha</th>
+                        <th className="py-1.5 font-medium">Công suất (kW)</th>
                       <th className="py-1.5 text-right font-medium">Giá / bộ</th>
                       <th className="py-1.5" />
                     </tr>
@@ -318,7 +319,8 @@ export default function AdminPage() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                  </table>
+                </div>
               </div>
             ))}
           </div>
