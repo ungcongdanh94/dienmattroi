@@ -145,7 +145,46 @@ export default function SolarCalculator() {
 
   const reportRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState<"png" | "pdf" | null>(null);
-  const [customerView, setCustomerView] = useState<boolean>(false);
+  const [customerView, setCustomerView] = useState<boolean>(true);
+  const [staffAuthenticated, setStaffAuthenticated] = useState<boolean | null>(null);
+  const [showStaffLogin, setShowStaffLogin] = useState(false);
+  const [staffPassword, setStaffPassword] = useState("");
+  const [staffLoginError, setStaffLoginError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/admin/session")
+      .then((r) => r.json())
+      .then((d) => setStaffAuthenticated(Boolean(d.authenticated)))
+      .catch(() => setStaffAuthenticated(false));
+  }, []);
+
+  // Khách hàng/khách vãng lai luôn chỉ thấy chế độ tổng tiền; chỉ tài khoản nội bộ đã đăng nhập mới xem được chi tiết.
+  const canViewInternal = staffAuthenticated === true;
+  const effectiveCustomerView = canViewInternal ? customerView : true;
+
+  async function handleStaffLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setStaffLoginError("");
+    const res = await fetch("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: staffPassword }),
+    });
+    if (res.ok) {
+      setStaffAuthenticated(true);
+      setCustomerView(false);
+      setShowStaffLogin(false);
+      setStaffPassword("");
+    } else {
+      setStaffLoginError("Sai mật khẩu.");
+    }
+  }
+
+  async function handleStaffLogout() {
+    await fetch("/api/admin/logout", { method: "POST" });
+    setStaffAuthenticated(false);
+    setCustomerView(true);
+  }
 
   const voltageList =
     customerType === "san_xuat" ? tariff.sanXuatByVoltage : customerType === "kinh_doanh" ? tariff.kinhDoanhByVoltage : [];
@@ -960,16 +999,58 @@ export default function SolarCalculator() {
         <section className="mt-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-display text-lg font-semibold text-navy">Bảng kê vật tư &amp; báo giá</h2>
-            <button
-              type="button"
-              onClick={() => setCustomerView((v) => !v)}
-              className={[
-                "rounded-full border px-4 py-1.5 text-xs font-semibold transition-colors",
-                customerView ? "border-navy bg-navy text-white" : "border-line bg-white text-ink/70 hover:border-navy/40",
-              ].join(" ")}
-            >
-              {customerView ? "Đang xem: Khách hàng (chỉ tổng tiền)" : "Đang xem: Nội bộ (đầy đủ chi tiết)"}
-            </button>
+            <div className="relative flex items-center gap-2">
+              {canViewInternal ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setCustomerView((v) => !v)}
+                    className={[
+                      "rounded-full border px-4 py-1.5 text-xs font-semibold transition-colors",
+                      effectiveCustomerView ? "border-navy bg-navy text-white" : "border-line bg-white text-ink/70 hover:border-navy/40",
+                    ].join(" ")}
+                  >
+                    {effectiveCustomerView ? "Đang xem: Khách hàng (chỉ tổng tiền)" : "Đang xem: Nội bộ (đầy đủ chi tiết)"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleStaffLogout}
+                    className="rounded-full border border-line bg-white px-3 py-1.5 text-xs text-ink/50 hover:border-navy/40"
+                  >
+                    Đăng xuất
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowStaffLogin((v) => !v)}
+                  className="rounded-full border border-line bg-white px-4 py-1.5 text-xs font-semibold text-ink/70 hover:border-navy/40"
+                >
+                  Đang xem: Khách hàng (chỉ tổng tiền) · Đăng nhập nội bộ
+                </button>
+              )}
+
+              {showStaffLogin && !canViewInternal && (
+                <form
+                  onSubmit={handleStaffLogin}
+                  className="absolute right-0 top-full z-10 mt-2 w-64 rounded-xl border border-line bg-white p-4 shadow-lg"
+                >
+                  <p className="text-xs font-semibold text-navy">Đăng nhập nội bộ</p>
+                  <input
+                    type="password"
+                    autoFocus
+                    value={staffPassword}
+                    onChange={(e) => setStaffPassword(e.target.value)}
+                    placeholder="Mật khẩu"
+                    className="mt-2 w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
+                  />
+                  {staffLoginError && <p className="mt-1.5 text-xs text-red-600">{staffLoginError}</p>}
+                  <button type="submit" className="mt-2 w-full rounded-lg bg-navy py-2 text-xs font-semibold text-white">
+                    Đăng nhập
+                  </button>
+                </form>
+              )}
+            </div>
           </div>
           <p className="mt-1 text-[13px] text-ink/55">
             Toàn bộ đơn giá được quản lý tại{" "}
@@ -979,14 +1060,14 @@ export default function SolarCalculator() {
             . Số mét cáp DC/AC là <strong>dự toán ban đầu</strong> (gợi ý sẵn theo mức phổ biến, có thể sửa tay) — sẽ khảo sát thực tế và báo lại chính xác sau.
           </p>
 
-          {customerView ? (
+          {effectiveCustomerView ? (
             <div className="mt-3 overflow-hidden rounded-2xl border border-line bg-white">
               <div className="border-b border-line bg-navy px-6 py-4 text-white">
                 <div className="text-sm text-white/60">Combo: {selectedPanel?.brand} {selectedPanel?.wattage}Wp · {selectedInverter?.brand} {selectedInverter?.capacityKw}kW{selectedBattery && equipment?.batteryModuleCount !== null ? ` · Pin ${selectedBattery.brand}` : ""}</div>
                 <div className="mt-1 text-xs text-white/40">Báo giá dự toán, đã bao gồm thiết bị, khung/giá đỡ, dây dẫn, nhân công và vận chuyển.</div>
               </div>
               <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-3">
-                <MetricCard label="Công suất hệ thống" value={`${result.pvSizeKwp} kWp`} />
+                <MetricCard label="Công suất hệ thống" value={`${round1(actualCapacityKwp || result.pvSizeKwp)} kWp`} />
                 <MetricCard label="Số tấm pin" value={`${equipment?.panelCount ?? 0} tấm`} />
                 <MetricCard label="Tiết kiệm/tháng ước tính" value={vnd(savingsPerMonth)} accent="#27A36A" />
               </div>

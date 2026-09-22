@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { EquipmentCatalog, PanelSpec, InverterSpec, BatterySpec } from "@/lib/catalog-types";
 import type { ProjectEntry } from "@/lib/projects-store";
 import type { QuoteRecord } from "@/lib/quotes-store";
+import { readExcelRows, parsePanelRows, parseInverterRows, parseBatteryRows, downloadTemplate } from "@/lib/excel-import";
+
+type ImportKind = "panels" | "inverters" | "batteries";
 
 export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -15,6 +18,11 @@ export default function AdminPage() {
   const [projectSaveStatus, setProjectSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<QuoteRecord[] | null>(null);
+  const [importErrors, setImportErrors] = useState<Record<ImportKind, string[]>>({ panels: [], inverters: [], batteries: [] });
+  const [importNotice, setImportNotice] = useState<Record<ImportKind, string>>({ panels: "", inverters: "", batteries: "" });
+  const panelFileRef = useRef<HTMLInputElement>(null);
+  const inverterFileRef = useRef<HTMLInputElement>(null);
+  const batteryFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/admin/session")
@@ -178,6 +186,50 @@ export default function AdminPage() {
     setCatalog((c) => (c ? { ...c, batteries: [...c.batteries, { id: `bat-${Date.now()}`, brand: "", moduleKwh: 0, priceVnd: 0 }] } : c));
   }
 
+  async function handleImportFile(kind: ImportKind, file: File) {
+    if (!catalog) return;
+    setImportErrors((s) => ({ ...s, [kind]: [] }));
+    setImportNotice((s) => ({ ...s, [kind]: "" }));
+    try {
+      const rawRows = await readExcelRows(file);
+      if (rawRows.length === 0) {
+        setImportErrors((s) => ({ ...s, [kind]: ["File không có dữ liệu."] }));
+        return;
+      }
+
+      if (kind === "panels") {
+        const result = parsePanelRows(rawRows, catalog.panels);
+        if (!result.ok) {
+          setImportErrors((s) => ({ ...s, panels: result.errors }));
+          return;
+        }
+        const newRows: PanelSpec[] = result.rows.map((r, i) => ({ ...r, id: `panel-${Date.now()}-${i}` }));
+        setCatalog((c) => (c ? { ...c, panels: [...c.panels, ...newRows] } : c));
+        setImportNotice((s) => ({ ...s, panels: `Đã nhập ${newRows.length} dòng — nhớ bấm "Lưu bảng giá" để lưu lại.` }));
+      } else if (kind === "inverters") {
+        const result = parseInverterRows(rawRows, catalog.inverters);
+        if (!result.ok) {
+          setImportErrors((s) => ({ ...s, inverters: result.errors }));
+          return;
+        }
+        const newRows: InverterSpec[] = result.rows.map((r, i) => ({ ...r, id: `inv-${Date.now()}-${i}` }));
+        setCatalog((c) => (c ? { ...c, inverters: [...c.inverters, ...newRows] } : c));
+        setImportNotice((s) => ({ ...s, inverters: `Đã nhập ${newRows.length} dòng — nhớ bấm "Lưu bảng giá" để lưu lại.` }));
+      } else {
+        const result = parseBatteryRows(rawRows, catalog.batteries);
+        if (!result.ok) {
+          setImportErrors((s) => ({ ...s, batteries: result.errors }));
+          return;
+        }
+        const newRows: BatterySpec[] = result.rows.map((r, i) => ({ ...r, id: `bat-${Date.now()}-${i}` }));
+        setCatalog((c) => (c ? { ...c, batteries: [...c.batteries, ...newRows] } : c));
+        setImportNotice((s) => ({ ...s, batteries: `Đã nhập ${newRows.length} dòng — nhớ bấm "Lưu bảng giá" để lưu lại.` }));
+      }
+    } catch {
+      setImportErrors((s) => ({ ...s, [kind]: ["Không đọc được file. Hãy chắc chắn đây là file Excel (.xlsx) hợp lệ."] }));
+    }
+  }
+
   const inverterBrandOrder: string[] = [];
   for (const inv of catalog.inverters) {
     if (!inverterBrandOrder.includes(inv.brand)) inverterBrandOrder.push(inv.brand);
@@ -202,6 +254,7 @@ export default function AdminPage() {
 
         {/* Panels */}
         <CatalogSection title="Tấm pin" onAdd={addPanel}>
+          <ImportBar kind="panels" fileRef={panelFileRef} onFile={(f) => handleImportFile("panels", f)} errors={importErrors.panels} notice={importNotice.panels} />
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[13px] text-ink/50">
@@ -249,6 +302,16 @@ export default function AdminPage() {
             <button type="button" onClick={addNewInverterBrand} className="text-sm font-medium text-solarblue hover:underline">
               + Thêm thương hiệu
             </button>
+          </div>
+
+          <div className="px-5 pt-4">
+            <ImportBar
+              kind="inverters"
+              fileRef={inverterFileRef}
+              onFile={(f) => handleImportFile("inverters", f)}
+              errors={importErrors.inverters}
+              notice={importNotice.inverters}
+            />
           </div>
 
           <div className="divide-y divide-line">
@@ -328,6 +391,7 @@ export default function AdminPage() {
 
         {/* Batteries */}
         <CatalogSection title="Pin lưu trữ" onAdd={addBattery}>
+          <ImportBar kind="batteries" fileRef={batteryFileRef} onFile={(f) => handleImportFile("batteries", f)} errors={importErrors.batteries} notice={importNotice.batteries} />
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[13px] text-ink/50">
@@ -581,6 +645,59 @@ function PriceField({ label, value, onChange }: { label: string; value: number; 
         onChange={(e) => onChange(Number(e.target.value) || 0)}
         className="mt-1.5 w-full rounded-lg border border-line px-3 py-2 text-right font-mono text-sm"
       />
+    </div>
+  );
+}
+
+function ImportBar({
+  kind,
+  fileRef,
+  onFile,
+  errors,
+  notice,
+}: {
+  kind: ImportKind;
+  fileRef: React.RefObject<HTMLInputElement>;
+  onFile: (file: File) => void;
+  errors: string[];
+  notice: string;
+}) {
+  return (
+    <div className="mb-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" onClick={() => downloadTemplate(kind)} className="text-xs font-medium text-ink/50 hover:text-navy hover:underline">
+          Tải file mẫu Excel
+        </button>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-navy hover:border-navy/40"
+        >
+          Nhập từ Excel
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onFile(file);
+            e.target.value = "";
+          }}
+        />
+      </div>
+      {notice && <p className="mt-2 text-xs font-medium text-energy">{notice}</p>}
+      {errors.length > 0 && (
+        <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-3">
+          <p className="text-xs font-semibold text-red-700">Không nhập được — vui lòng sửa file và thử lại:</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-red-600">
+            {errors.map((err, i) => (
+              <li key={i}>{err}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
