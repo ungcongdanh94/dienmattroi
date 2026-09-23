@@ -742,8 +742,6 @@ export default function SolarCalculator() {
               </div>
 
               <div className="mt-5 grid grid-cols-2 gap-2.5 text-sm">
-                <Readout label="Số tấm pin" value={`${result.panelCount} tấm`} />
-                <Readout label="Inverter" value={`${result.inverterSizeKw} kW`} />
                 <Readout label="Tiêu thụ/ngày" value={`${result.dailyKwh} kWh`} />
                 <Readout label="Ban ngày" value={`${result.dayKwh} kWh`} />
                 <Readout label="Ban đêm" value={`${result.nightKwh} kWh`} />
