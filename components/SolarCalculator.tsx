@@ -106,6 +106,7 @@ export default function SolarCalculator() {
   const [inverterId, setInverterId] = useState<string>(FALLBACK_CATALOG.inverters[0].id);
   const [batteryBrand, setBatteryBrand] = useState<string>(FALLBACK_CATALOG.batteries[0].brand);
   const [batteryId, setBatteryId] = useState<string>(FALLBACK_CATALOG.batteries[0].id);
+  const [panelCountManual, setPanelCountManual] = useState<number>(0);
 
   useEffect(() => {
     fetch("/api/catalog")
@@ -327,19 +328,30 @@ export default function SolarCalculator() {
     if (first) setBatteryId(first.id);
   }
 
-  const equipment = useMemo(
-    () =>
-      selectedPanel
-        ? computeEquipmentSelection(
-            selectedPanel,
-            result.batteryCapacityKwh !== null ? selectedBattery ?? null : null,
-            result.pvSizeKwp,
-            result.batteryCapacityKwh,
-            mountingType,
-          )
-        : null,
-    [selectedPanel, selectedBattery, result, mountingType],
+  // Số tấm pin GỢI Ý theo công suất đề xuất — chỉ là điểm khởi đầu, khách hàng có thể sửa lại số lượng tuỳ ý.
+  const suggestedPanelCount = useMemo(
+    () => (selectedPanel ? Math.ceil((result.pvSizeKwp * 1000) / selectedPanel.wattage) : 0),
+    [selectedPanel, result.pvSizeKwp],
   );
+  useEffect(() => {
+    setPanelCountManual(suggestedPanelCount);
+  }, [suggestedPanelCount]);
+
+  const equipment = useMemo(() => {
+    if (!selectedPanel) return null;
+    const base = computeEquipmentSelection(
+      selectedPanel,
+      result.batteryCapacityKwh !== null ? selectedBattery ?? null : null,
+      result.pvSizeKwp,
+      result.batteryCapacityKwh,
+      mountingType,
+    );
+    const panelCount = Math.max(0, panelCountManual);
+    const panelAreaM2 = Math.round(((selectedPanel.lengthMm / 1000) * (selectedPanel.widthMm / 1000)) * 100) / 100;
+    const footprintAreaM2 = Math.round(panelCount * panelAreaM2 * 100) / 100;
+    const installedAreaM2 = Math.round(footprintAreaM2 * MOUNTING_FACTOR[mountingType].factor * 100) / 100;
+    return { ...base, panelCount, panelAreaM2, footprintAreaM2, installedAreaM2 };
+  }, [selectedPanel, selectedBattery, result, mountingType, panelCountManual]);
 
   // Công suất THỰC LẮP (số tấm × công suất/tấm) — dùng cho khung/cáp/tủ điện/nhân công,
   // vì thường lớn hơn công suất yêu cầu (result.pvSizeKwp) do làm tròn số tấm lên.
@@ -829,8 +841,7 @@ export default function SolarCalculator() {
         {/* Equipment advisory */}
         <section className="mt-8">
           <h2 className="font-display text-lg font-semibold text-navy">Phương án thiết bị gợi ý</h2>
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <AdvisoryCard title="Điện áp / số pha" value={result.equipmentAdvisory.phase.recommended} reason={result.equipmentAdvisory.phase.reason} />
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <AdvisoryCard title="Loại inverter" value={result.equipmentAdvisory.inverterType.label} reason={result.equipmentAdvisory.inverterType.reason} />
             <AdvisoryCard
               title="Loại pin lưu trữ"
@@ -984,11 +995,28 @@ export default function SolarCalculator() {
           {equipment && selectedPanel && selectedInverter && (
             <div className="mt-4 rounded-2xl border border-line bg-white p-5">
               <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-4">
-                <Row label={`Tấm pin (${equipment.panelAreaM2} m²/tấm)`} value={`${equipment.panelCount} tấm`} />
+                <Row
+                  label={`Tấm pin (${equipment.panelAreaM2} m²/tấm)`}
+                  valueNode={
+                    <span className="flex items-center gap-1.5 font-mono font-medium">
+                      <input
+                        type="number"
+                        min={0}
+                        value={panelCountManual}
+                        onChange={(e) => setPanelCountManual(Math.max(0, Number(e.target.value) || 0))}
+                        className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono"
+                      />
+                      tấm
+                    </span>
+                  }
+                />
                 <Row label="Diện tích mái cần lắp" value={`${equipment.installedAreaM2} m²`} accent="#F4B63F" />
                 <Row label="Inverter" value={`${selectedInverter.capacityKw} kW · ${selectedInverter.phase === "1_pha" ? "1 pha" : "3 pha"}`} />
                 {equipment.batteryModuleCount !== null && <Row label="Pin lưu trữ" value={`${equipment.batteryModuleCount} module`} />}
               </div>
+              <p className="mt-3 text-[12px] text-ink/45">
+                Số tấm pin gợi ý theo công suất đề xuất ({suggestedPanelCount} tấm) — có thể sửa lại số lượng thực tế, các giá trị khác sẽ tự tính lại theo số tấm đã chọn.
+              </p>
             </div>
           )}
         </section>
@@ -1365,13 +1393,25 @@ function ToggleButton({ active, onClick, label }: { active: boolean; onClick: ()
   );
 }
 
-function Row({ label, value, accent }: { label: string; value: string; accent?: string }) {
+function Row({
+  label,
+  value,
+  accent,
+  valueNode,
+}: {
+  label: string;
+  value?: string;
+  accent?: string;
+  valueNode?: React.ReactNode;
+}) {
   return (
-    <div className="flex justify-between border-b border-line/60 pb-2 last:border-0 last:pb-0">
+    <div className="flex items-center justify-between border-b border-line/60 pb-2 last:border-0 last:pb-0">
       <span className="text-ink/55">{label}</span>
-      <span className="font-mono font-medium" style={accent ? { color: accent } : undefined}>
-        {value}
-      </span>
+      {valueNode ?? (
+        <span className="font-mono font-medium" style={accent ? { color: accent } : undefined}>
+          {value}
+        </span>
+      )}
     </div>
   );
 }
