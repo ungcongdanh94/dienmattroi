@@ -5,6 +5,8 @@ export interface PanelSpec {
   lengthMm: number;
   widthMm: number;
   priceVnd: number;
+  /** Thời hạn bảo hành theo chính sách nhà sản xuất, vd. "12 năm sản phẩm / 25 năm hiệu suất". */
+  warranty: string;
 }
 
 /**
@@ -43,6 +45,8 @@ export interface InverterSpec {
   kind: InverterKind;
   capacityKw: number;
   priceVnd: number;
+  /** Thời hạn bảo hành theo chính sách nhà sản xuất, vd. "5 năm" hoặc "10 năm". */
+  warranty: string;
 }
 
 export interface BatterySpec {
@@ -50,6 +54,8 @@ export interface BatterySpec {
   brand: string;
   moduleKwh: number;
   priceVnd: number;
+  /** Thời hạn bảo hành theo chính sách nhà sản xuất, vd. "10 năm" hoặc "6.000 chu kỳ". */
+  warranty: string;
 }
 
 export interface CabinetPriceTier {

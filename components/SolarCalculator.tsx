@@ -59,9 +59,9 @@ const KIND_LABEL: Record<InverterKind, string> = {
 };
 
 const FALLBACK_CATALOG: EquipmentCatalog = {
-  panels: [{ id: "aiko-655", brand: "AIKO", wattage: 655, lengthMm: 2382, widthMm: 1134, priceVnd: 0 }],
-  inverters: [{ id: "solis-5", brand: "Solis", phase: "1_pha", kind: "hybrid", capacityKw: 5, priceVnd: 0 }],
-  batteries: [{ id: "dyness-14336", brand: "Dyness", moduleKwh: 14.336, priceVnd: 0 }],
+  panels: [{ id: "aiko-655", brand: "AIKO", wattage: 655, lengthMm: 2382, widthMm: 1134, priceVnd: 0, warranty: "" }],
+  inverters: [{ id: "solis-5", brand: "Solis", phase: "1_pha", kind: "hybrid", capacityKw: 5, priceVnd: 0, warranty: "" }],
+  batteries: [{ id: "dyness-14336", brand: "Dyness", moduleKwh: 14.336, priceVnd: 0, warranty: "" }],
   otherPricing: {
     framePerKwpApMai: 0,
     framePerKwpGiaDoNghieng: 0,
@@ -417,6 +417,7 @@ export default function SolarCalculator() {
         qty: equipment.panelCount,
         unit: "tấm",
         unitPriceVnd: selectedPanel.priceVnd,
+        warranty: selectedPanel.warranty,
       },
       {
         id: "inverter",
@@ -425,6 +426,7 @@ export default function SolarCalculator() {
         qty: 1,
         unit: "bộ",
         unitPriceVnd: selectedInverter.priceVnd,
+        warranty: selectedInverter.warranty,
       },
     ];
     if (equipment.batteryModuleCount !== null && selectedBattery) {
@@ -435,6 +437,7 @@ export default function SolarCalculator() {
         qty: equipment.batteryModuleCount,
         unit: "bộ",
         unitPriceVnd: selectedBattery.priceVnd,
+        warranty: selectedBattery.warranty,
       });
     }
     const op = catalog.otherPricing;
@@ -1163,6 +1166,15 @@ export default function SolarCalculator() {
                 <MetricCard label="Số tấm pin" value={`${equipment?.panelCount ?? 0} tấm`} />
                 <MetricCard label="Tiết kiệm/tháng ước tính" value={vnd(savingsPerMonth)} accent="#27A36A" />
               </div>
+              <div className="border-t border-line px-6 py-4">
+                <div className="text-xs font-medium text-ink/50">Bảo hành thiết bị</div>
+                <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-[13px] text-ink/70">
+                  {selectedPanel?.warranty && <span>Tấm pin: <span className="font-medium text-navy">{selectedPanel.warranty}</span></span>}
+                  {selectedInverter?.warranty && <span>Inverter: <span className="font-medium text-navy">{selectedInverter.warranty}</span></span>}
+                  {selectedBattery?.warranty && equipment?.batteryModuleCount !== null && <span>Pin lưu trữ: <span className="font-medium text-navy">{selectedBattery.warranty}</span></span>}
+                </div>
+                <p className="mt-1.5 text-xs text-ink/40">Bảo hành theo chính sách của nhà sản xuất.</p>
+              </div>
               <div className="border-t border-line bg-energy/[0.06] px-6 py-5">
                 <div className="text-xs text-ink/50">Tổng thanh toán (dự toán)</div>
                 <div className="mt-1 font-mono text-2xl font-bold text-energy">{vnd(totalPayment)}</div>
@@ -1179,6 +1191,7 @@ export default function SolarCalculator() {
                   <th className="px-4 py-3 text-right font-medium">Số lượng</th>
                   <th className="px-4 py-3 text-right font-medium">Đơn giá</th>
                   <th className="px-4 py-3 text-right font-medium">Thành tiền</th>
+                  <th className="px-4 py-3 font-medium">Bảo hành</th>
                 </tr>
               </thead>
               <tbody>
@@ -1207,11 +1220,13 @@ export default function SolarCalculator() {
                       <span className="font-mono text-ink/70">{vnd(it.unitPriceVnd)}</span>
                     </td>
                     <td className="px-4 py-3 text-right font-mono font-medium">{vnd(itemTotal(it))}</td>
+                    <td className="px-4 py-3 text-ink/55">{it.warranty || "—"}</td>
                   </tr>
                 ))}
                 <tr className="border-t border-line">
                   <td colSpan={4} className="px-4 py-3 text-right text-ink/70">Tổng trước chiết khấu</td>
                   <td className="px-4 py-3 text-right font-mono font-medium">{vnd(sub)}</td>
+                  <td className="px-4 py-3"></td>
                 </tr>
                 <tr className="bg-gold/[0.06]">
                   <td colSpan={3} className="px-4 py-3 text-right text-ink/70">Chiết khấu thương mại</td>
@@ -1219,13 +1234,16 @@ export default function SolarCalculator() {
                     <input type="number" min={0} max={100} value={discountPercent} onChange={(e) => setDiscountPercent(Number(e.target.value) || 0)} className="w-16 rounded-md border border-line px-2.5 py-1.5 text-right font-mono" />%
                   </td>
                   <td className="px-4 py-3 text-right font-mono">-{vnd(sub - totalPayment)}</td>
+                  <td className="px-4 py-3"></td>
                 </tr>
                 <tr className="bg-energy/[0.08]">
                   <td colSpan={4} className="px-4 py-3 text-right text-[15px] font-semibold text-navy">Tổng thanh toán</td>
                   <td className="px-4 py-3 text-right font-mono text-[15px] font-semibold text-energy">{vnd(totalPayment)}</td>
+                  <td className="px-4 py-3"></td>
                 </tr>
               </tbody>
             </table>
+            <p className="border-t border-line px-4 py-2.5 text-xs text-ink/40">Bảo hành theo chính sách của nhà sản xuất.</p>
           </div>
           )}
         </section>

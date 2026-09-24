@@ -18,24 +18,24 @@ const CATALOG_PATH = path.join(DATA_DIR, "catalog.json");
 
 const DEFAULT_CATALOG: EquipmentCatalog = {
   panels: [
-    { id: "aiko-655", brand: "AIKO", wattage: 655, lengthMm: 2382, widthMm: 1134, priceVnd: 0 },
-    { id: "leapton-715", brand: "LEAPTON", wattage: 715, lengthMm: 2384, widthMm: 1303, priceVnd: 0 },
+    { id: "aiko-655", brand: "AIKO", wattage: 655, lengthMm: 2382, widthMm: 1134, priceVnd: 0, warranty: "" },
+    { id: "leapton-715", brand: "LEAPTON", wattage: 715, lengthMm: 2384, widthMm: 1303, priceVnd: 0, warranty: "" },
   ],
   inverters: [
-    { id: "solis-3", brand: "Solis", phase: "1_pha", kind: "hybrid", capacityKw: 3, priceVnd: 0 },
-    { id: "solis-5", brand: "Solis", phase: "1_pha", kind: "hybrid", capacityKw: 5, priceVnd: 0 },
-    { id: "solis-6", brand: "Solis", phase: "1_pha", kind: "hybrid", capacityKw: 6, priceVnd: 0 },
-    { id: "solis-8", brand: "Solis", phase: "1_pha", kind: "hybrid", capacityKw: 8, priceVnd: 0 },
-    { id: "solis-10", brand: "Solis", phase: "3_pha_lv", kind: "hybrid", capacityKw: 10, priceVnd: 0 },
-    { id: "sofar-3", brand: "Sofar", phase: "1_pha", kind: "hybrid", capacityKw: 3, priceVnd: 0 },
-    { id: "sofar-5", brand: "Sofar", phase: "1_pha", kind: "hybrid", capacityKw: 5, priceVnd: 0 },
-    { id: "sofar-6", brand: "Sofar", phase: "1_pha", kind: "hybrid", capacityKw: 6, priceVnd: 0 },
-    { id: "sofar-8", brand: "Sofar", phase: "1_pha", kind: "hybrid", capacityKw: 8, priceVnd: 0 },
-    { id: "sofar-10", brand: "Sofar", phase: "3_pha_lv", kind: "hybrid", capacityKw: 10, priceVnd: 0 },
+    { id: "solis-3", brand: "Solis", phase: "1_pha", kind: "hybrid", capacityKw: 3, priceVnd: 0, warranty: "" },
+    { id: "solis-5", brand: "Solis", phase: "1_pha", kind: "hybrid", capacityKw: 5, priceVnd: 0, warranty: "" },
+    { id: "solis-6", brand: "Solis", phase: "1_pha", kind: "hybrid", capacityKw: 6, priceVnd: 0, warranty: "" },
+    { id: "solis-8", brand: "Solis", phase: "1_pha", kind: "hybrid", capacityKw: 8, priceVnd: 0, warranty: "" },
+    { id: "solis-10", brand: "Solis", phase: "3_pha_lv", kind: "hybrid", capacityKw: 10, priceVnd: 0, warranty: "" },
+    { id: "sofar-3", brand: "Sofar", phase: "1_pha", kind: "hybrid", capacityKw: 3, priceVnd: 0, warranty: "" },
+    { id: "sofar-5", brand: "Sofar", phase: "1_pha", kind: "hybrid", capacityKw: 5, priceVnd: 0, warranty: "" },
+    { id: "sofar-6", brand: "Sofar", phase: "1_pha", kind: "hybrid", capacityKw: 6, priceVnd: 0, warranty: "" },
+    { id: "sofar-8", brand: "Sofar", phase: "1_pha", kind: "hybrid", capacityKw: 8, priceVnd: 0, warranty: "" },
+    { id: "sofar-10", brand: "Sofar", phase: "3_pha_lv", kind: "hybrid", capacityKw: 10, priceVnd: 0, warranty: "" },
   ],
   batteries: [
-    { id: "dyness-14336", brand: "Dyness", moduleKwh: 14.336, priceVnd: 0 },
-    { id: "sofar-16", brand: "Sofar", moduleKwh: 16, priceVnd: 0 },
+    { id: "dyness-14336", brand: "Dyness", moduleKwh: 14.336, priceVnd: 0, warranty: "" },
+    { id: "sofar-16", brand: "Sofar", moduleKwh: 16, priceVnd: 0, warranty: "" },
   ],
   otherPricing: {
     framePerKwpApMai: 0,
@@ -66,11 +66,15 @@ export function getCatalog(): EquipmentCatalog {
     // Vá dữ liệu cũ: nếu file đã lưu từ trước khi có trường mới (vd otherPricing),
     // merge với giá trị mặc định thay vì để undefined làm crash app.
     const merged: EquipmentCatalog = {
-      panels: parsed.panels?.length ? parsed.panels : DEFAULT_CATALOG.panels,
+      panels: parsed.panels?.length
+        ? parsed.panels.map((p) => ({ ...p, warranty: p.warranty ?? "" }))
+        : DEFAULT_CATALOG.panels,
       inverters: parsed.inverters?.length
-        ? parsed.inverters.map((inv) => ({ ...inv, phase: normalizePhase(inv.phase), kind: inv.kind ?? "hybrid" }))
+        ? parsed.inverters.map((inv) => ({ ...inv, phase: normalizePhase(inv.phase), kind: inv.kind ?? "hybrid", warranty: inv.warranty ?? "" }))
         : DEFAULT_CATALOG.inverters,
-      batteries: parsed.batteries?.length ? parsed.batteries : DEFAULT_CATALOG.batteries,
+      batteries: parsed.batteries?.length
+        ? parsed.batteries.map((b) => ({ ...b, warranty: b.warranty ?? "" }))
+        : DEFAULT_CATALOG.batteries,
       otherPricing: { ...DEFAULT_CATALOG.otherPricing, ...(parsed.otherPricing ?? {}) },
     };
     return merged;

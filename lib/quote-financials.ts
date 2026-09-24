@@ -12,6 +12,8 @@ export interface QuoteItem {
   qty: number;
   unit: string;
   unitPriceVnd: number;
+  /** Thời hạn bảo hành theo chính sách nhà sản xuất — chỉ có ở thiết bị (tấm pin/inverter/pin lưu trữ). */
+  warranty?: string;
 }
 
 export function itemTotal(item: QuoteItem): number {

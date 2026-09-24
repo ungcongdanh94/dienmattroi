@@ -164,12 +164,16 @@ export default function AdminPage() {
   }
   function addPanel() {
     setCatalog((c) =>
-      c ? { ...c, panels: [...c.panels, { id: `panel-${Date.now()}`, brand: "", wattage: 0, lengthMm: 0, widthMm: 0, priceVnd: 0 }] } : c,
+      c
+        ? { ...c, panels: [...c.panels, { id: `panel-${Date.now()}`, brand: "", wattage: 0, lengthMm: 0, widthMm: 0, priceVnd: 0, warranty: "" }] }
+        : c,
     );
   }
   function addInverterToBrand(brand: string) {
     setCatalog((c) =>
-      c ? { ...c, inverters: [...c.inverters, { id: `inv-${Date.now()}`, brand, phase: "1_pha", kind: "hybrid", capacityKw: 0, priceVnd: 0 }] } : c,
+      c
+        ? { ...c, inverters: [...c.inverters, { id: `inv-${Date.now()}`, brand, phase: "1_pha", kind: "hybrid", capacityKw: 0, priceVnd: 0, warranty: "" }] }
+        : c,
     );
   }
   function renameInverterBrand(oldBrand: string, newBrand: string) {
@@ -183,7 +187,9 @@ export default function AdminPage() {
     if (name && name.trim()) addInverterToBrand(name.trim());
   }
   function addBattery() {
-    setCatalog((c) => (c ? { ...c, batteries: [...c.batteries, { id: `bat-${Date.now()}`, brand: "", moduleKwh: 0, priceVnd: 0 }] } : c));
+    setCatalog((c) =>
+      c ? { ...c, batteries: [...c.batteries, { id: `bat-${Date.now()}`, brand: "", moduleKwh: 0, priceVnd: 0, warranty: "" }] } : c,
+    );
   }
 
   async function handleImportFile(kind: ImportKind, file: File) {
@@ -263,6 +269,7 @@ export default function AdminPage() {
                 <th className="px-3 py-2 font-medium">Dài (mm)</th>
                 <th className="px-3 py-2 font-medium">Rộng (mm)</th>
                 <th className="px-3 py-2 text-right font-medium">Giá / tấm</th>
+                <th className="px-3 py-2 font-medium">Bảo hành</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
@@ -284,6 +291,14 @@ export default function AdminPage() {
                   <td className="px-3 py-2 text-right">
                     <input type="number" value={p.priceVnd} onChange={(e) => updatePanel(p.id, { priceVnd: Number(e.target.value) || 0 })} className="w-28 rounded-md border border-line px-2 py-1 text-right font-mono" />
                   </td>
+                  <td className="px-3 py-2">
+                    <input
+                      value={p.warranty}
+                      onChange={(e) => updatePanel(p.id, { warranty: e.target.value })}
+                      placeholder="vd. 12 năm sp / 25 năm hiệu suất"
+                      className="w-40 rounded-md border border-line px-2 py-1"
+                    />
+                  </td>
                   <td className="px-3 py-2 text-right">
                     <button type="button" onClick={() => removeRow("panels", p.id)} className="text-xs text-red-500 hover:underline">
                       Xoá
@@ -293,6 +308,7 @@ export default function AdminPage() {
               ))}
             </tbody>
           </table>
+          <p className="mt-2 px-1 text-[12px] text-ink/45">Bảo hành theo chính sách của nhà sản xuất.</p>
         </CatalogSection>
 
         {/* Inverters */}
@@ -341,6 +357,7 @@ export default function AdminPage() {
                         <th className="py-1.5 font-medium">Số pha</th>
                         <th className="py-1.5 font-medium">Công suất (kW)</th>
                       <th className="py-1.5 text-right font-medium">Giá / bộ</th>
+                      <th className="py-1.5 font-medium">Bảo hành</th>
                       <th className="py-1.5" />
                     </tr>
                   </thead>
@@ -376,6 +393,14 @@ export default function AdminPage() {
                         <td className="py-2 pr-2 text-right">
                           <input type="number" value={inv.priceVnd} onChange={(e) => updateInverter(inv.id, { priceVnd: Number(e.target.value) || 0 })} className="w-28 rounded-md border border-line px-2 py-1 text-right font-mono" />
                         </td>
+                        <td className="py-2 pr-2">
+                          <input
+                            value={inv.warranty}
+                            onChange={(e) => updateInverter(inv.id, { warranty: e.target.value })}
+                            placeholder="vd. 10 năm"
+                            className="w-32 rounded-md border border-line px-2 py-1"
+                          />
+                        </td>
                         <td className="py-2 text-right">
                           <button type="button" onClick={() => removeRow("inverters", inv.id)} className="text-xs text-red-500 hover:underline">
                             Xoá
@@ -389,6 +414,7 @@ export default function AdminPage() {
               </div>
             ))}
           </div>
+          <p className="px-5 pb-4 text-[12px] text-ink/45">Bảo hành theo chính sách của nhà sản xuất.</p>
         </div>
 
         {/* Batteries */}
@@ -400,6 +426,7 @@ export default function AdminPage() {
                 <th className="px-3 py-2 font-medium">Thương hiệu</th>
                 <th className="px-3 py-2 font-medium">Dung lượng (kWh)</th>
                 <th className="px-3 py-2 text-right font-medium">Giá / module</th>
+                <th className="px-3 py-2 font-medium">Bảo hành</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
@@ -415,6 +442,14 @@ export default function AdminPage() {
                   <td className="px-3 py-2 text-right">
                     <input type="number" value={b.priceVnd} onChange={(e) => updateBattery(b.id, { priceVnd: Number(e.target.value) || 0 })} className="w-28 rounded-md border border-line px-2 py-1 text-right font-mono" />
                   </td>
+                  <td className="px-3 py-2">
+                    <input
+                      value={b.warranty}
+                      onChange={(e) => updateBattery(b.id, { warranty: e.target.value })}
+                      placeholder="vd. 10 năm"
+                      className="w-32 rounded-md border border-line px-2 py-1"
+                    />
+                  </td>
                   <td className="px-3 py-2 text-right">
                     <button type="button" onClick={() => removeRow("batteries", b.id)} className="text-xs text-red-500 hover:underline">
                       Xoá
@@ -424,6 +459,7 @@ export default function AdminPage() {
               ))}
             </tbody>
           </table>
+          <p className="mt-2 px-1 text-[12px] text-ink/45">Bảo hành theo chính sách của nhà sản xuất.</p>
         </CatalogSection>
 
         {/* Other pricing */}

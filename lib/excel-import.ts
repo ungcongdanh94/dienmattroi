@@ -83,6 +83,7 @@ export function parsePanelRows(rawRows: Record<string, unknown>[], existing: Pan
     const lengthMm = parseNumber(getCell(row, "daimm", "dai"));
     const widthMm = parseNumber(getCell(row, "rongmm", "rong"));
     const priceVnd = parseNumber(getCell(row, "giatam", "gia"));
+    const warranty = String(getCell(row, "baohanh") ?? "").trim();
 
     if (!brand || wattage === null || lengthMm === null || widthMm === null || priceVnd === null) {
       errors.push(`Dòng ${rowNum}: thiếu hoặc sai dữ liệu (cần Thương hiệu, Công suất (Wp), Dài (mm), Rộng (mm), Giá / tấm).`);
@@ -99,7 +100,7 @@ export function parsePanelRows(rawRows: Record<string, unknown>[], existing: Pan
       return;
     }
     seenKeys.set(key, rowNum);
-    parsed.push({ brand, wattage, lengthMm, widthMm, priceVnd });
+    parsed.push({ brand, wattage, lengthMm, widthMm, priceVnd, warranty });
   });
 
   return { ok: errors.length === 0, rows: parsed, errors };
@@ -121,6 +122,7 @@ export function parseInverterRows(
     const kind = parseKind(getCell(row, "loai"));
     const capacityKw = parseNumber(getCell(row, "congsuatkw", "congsuat"));
     const priceVnd = parseNumber(getCell(row, "giabo", "gia"));
+    const warranty = String(getCell(row, "baohanh") ?? "").trim();
 
     if (!brand || !phase || !kind || capacityKw === null || priceVnd === null) {
       errors.push(
@@ -139,7 +141,7 @@ export function parseInverterRows(
       return;
     }
     seenKeys.set(key, rowNum);
-    parsed.push({ brand, phase, kind, capacityKw, priceVnd });
+    parsed.push({ brand, phase, kind, capacityKw, priceVnd, warranty });
   });
 
   return { ok: errors.length === 0, rows: parsed, errors };
@@ -156,6 +158,7 @@ export function parseBatteryRows(rawRows: Record<string, unknown>[], existing: B
     const brand = String(getCell(row, "thuonghieu") ?? "").trim();
     const moduleKwh = parseNumber(getCell(row, "dungluongkwh", "dungluong"));
     const priceVnd = parseNumber(getCell(row, "giamodule", "gia"));
+    const warranty = String(getCell(row, "baohanh") ?? "").trim();
 
     if (!brand || moduleKwh === null || priceVnd === null) {
       errors.push(`Dòng ${rowNum}: thiếu hoặc sai dữ liệu (cần Thương hiệu, Dung lượng (kWh), Giá / module).`);
@@ -172,7 +175,7 @@ export function parseBatteryRows(rawRows: Record<string, unknown>[], existing: B
       return;
     }
     seenKeys.set(key, rowNum);
-    parsed.push({ brand, moduleKwh, priceVnd });
+    parsed.push({ brand, moduleKwh, priceVnd, warranty });
   });
 
   return { ok: errors.length === 0, rows: parsed, errors };
@@ -184,21 +187,21 @@ export function downloadTemplate(kind: "panels" | "inverters" | "batteries") {
   let filename: string;
 
   if (kind === "panels") {
-    headers = ["Thương hiệu", "Công suất (Wp)", "Dài (mm)", "Rộng (mm)", "Giá / tấm"];
-    sample = [["Jinko", 550, 2278, 1134, 2500000]];
+    headers = ["Thương hiệu", "Công suất (Wp)", "Dài (mm)", "Rộng (mm)", "Giá / tấm", "Bảo hành"];
+    sample = [["Jinko", 550, 2278, 1134, 2500000, "12 năm sản phẩm / 25 năm hiệu suất"]];
     filename = "mau-tam-pin.xlsx";
   } else if (kind === "inverters") {
-    headers = ["Thương hiệu", "Loại", "Số pha", "Công suất (kW)", "Giá / bộ"];
+    headers = ["Thương hiệu", "Loại", "Số pha", "Công suất (kW)", "Giá / bộ", "Bảo hành"];
     sample = [
-      ["Deye", "Hybrid", "1 pha", 5, 25000000],
-      ["Deye", "Hybrid", "3 pha", 10, 45000000],
-      ["Solis", "Hybrid", "3 pha LV", 10, 48698000],
-      ["Solis", "Hybrid", "3 pha HV", 10, 39934000],
+      ["Deye", "Hybrid", "1 pha", 5, 25000000, "10 năm"],
+      ["Deye", "Hybrid", "3 pha", 10, 45000000, "10 năm"],
+      ["Solis", "Hybrid", "3 pha LV", 10, 48698000, "5 năm"],
+      ["Solis", "Hybrid", "3 pha HV", 10, 39934000, "5 năm"],
     ];
     filename = "mau-inverter.xlsx";
   } else {
-    headers = ["Thương hiệu", "Dung lượng (kWh)", "Giá / module"];
-    sample = [["Pylontech", 3.5, 18000000]];
+    headers = ["Thương hiệu", "Dung lượng (kWh)", "Giá / module", "Bảo hành"];
+    sample = [["Pylontech", 3.5, 18000000, "10 năm"]];
     filename = "mau-pin-luu-tru.xlsx";
   }
 
