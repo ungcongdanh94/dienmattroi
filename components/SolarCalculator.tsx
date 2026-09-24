@@ -18,6 +18,7 @@ import {
   type InverterSpec,
   type BatterySpec,
   type Phase,
+  type InverterKind,
 } from "@/lib/catalog-types";
 import {
   EVN_TARIFF_2026,
@@ -49,6 +50,12 @@ const SYSTEM_LABEL: Record<SystemType, { title: string; desc: string }> = {
   on_grid: { title: "On-grid", desc: "Hoà lưới, không pin — bù hoá đơn tiền điện" },
   off_grid: { title: "Off-grid", desc: "Độc lập hoàn toàn, không nối lưới" },
   hybrid: { title: "Hybrid", desc: "Hoà lưới + pin backup khi mất điện" },
+};
+
+const KIND_LABEL: Record<InverterKind, string> = {
+  on_grid: "Hoà lưới",
+  hybrid: "Hybrid",
+  off_grid: "Off-grid",
 };
 
 const FALLBACK_CATALOG: EquipmentCatalog = {
@@ -104,6 +111,7 @@ export default function SolarCalculator() {
   const [panelBrand, setPanelBrand] = useState<string>(FALLBACK_CATALOG.panels[0].brand);
   const [panelId, setPanelId] = useState<string>(FALLBACK_CATALOG.panels[0].id);
   const [inverterBrand, setInverterBrand] = useState<string>(FALLBACK_CATALOG.inverters[0].brand);
+  const [inverterKind, setInverterKind] = useState<InverterKind>(FALLBACK_CATALOG.inverters[0].kind);
   const [inverterPhase, setInverterPhase] = useState<Phase>(FALLBACK_CATALOG.inverters[0].phase);
   const [inverterId, setInverterId] = useState<string>(FALLBACK_CATALOG.inverters[0].id);
   const [batteryBrand, setBatteryBrand] = useState<string>(FALLBACK_CATALOG.batteries[0].brand);
@@ -125,6 +133,7 @@ export default function SolarCalculator() {
         setPanelBrand(safe.panels[0].brand);
         setPanelId(safe.panels[0].id);
         setInverterBrand(safe.inverters[0]?.brand ?? "");
+        setInverterKind(safe.inverters[0]?.kind ?? "hybrid");
         setInverterPhase(safe.inverters[0]?.phase ?? "1_pha");
         setInverterId(safe.inverters[0]?.id ?? "");
         setBatteryBrand(safe.batteries[0]?.brand ?? "");
@@ -284,11 +293,34 @@ export default function SolarCalculator() {
   const batteryBrands = useMemo(() => Array.from(new Set(catalog.batteries.map((b) => b.brand))), [catalog]);
 
   const panelsForBrand = catalog.panels.filter((p) => p.brand === panelBrand);
-  const invertersForBrand = invertersMatchingSystemType.filter((i) => i.brand === inverterBrand && i.phase === inverterPhase);
   const batteriesForBrand = catalog.batteries.filter((b) => b.brand === batteryBrand);
 
+  // Cascade chọn inverter: Hãng -> Loại -> Số pha -> Công suất — mỗi bước chỉ liệt kê
+  // lựa chọn thực sự tồn tại cho các bước trước đó, để không bao giờ ra "không có model phù hợp".
+  const invertersForBrand = useMemo(
+    () => invertersMatchingSystemType.filter((i) => i.brand === inverterBrand),
+    [invertersMatchingSystemType, inverterBrand],
+  );
+  const kindsForBrand = useMemo(
+    () => Array.from(new Set(invertersForBrand.map((i) => i.kind))),
+    [invertersForBrand],
+  );
+  const invertersForBrandKind = useMemo(
+    () => invertersForBrand.filter((i) => i.kind === inverterKind),
+    [invertersForBrand, inverterKind],
+  );
+  const phasesForBrandKind = useMemo(
+    () => Array.from(new Set(invertersForBrandKind.map((i) => i.phase))),
+    [invertersForBrandKind],
+  );
+  const invertersForBrandKindPhase = useMemo(
+    () => invertersForBrandKind.filter((i) => i.phase === inverterPhase),
+    [invertersForBrandKind, inverterPhase],
+  );
+
   const selectedPanel: PanelSpec | undefined = panelsForBrand.find((p) => p.id === panelId) ?? panelsForBrand[0];
-  const selectedInverter: InverterSpec | undefined = invertersForBrand.find((i) => i.id === inverterId) ?? invertersForBrand[0];
+  const selectedInverter: InverterSpec | undefined =
+    invertersForBrandKindPhase.find((i) => i.id === inverterId) ?? invertersForBrandKindPhase[0];
   const selectedBattery: BatterySpec | undefined = batteriesForBrand.find((b) => b.id === batteryId) ?? batteriesForBrand[0];
 
   function handlePanelBrandChange(brand: string) {
@@ -298,11 +330,12 @@ export default function SolarCalculator() {
   }
   useEffect(() => {
     const stillValid = invertersMatchingSystemType.some(
-      (i) => i.brand === inverterBrand && i.phase === inverterPhase && i.id === inverterId,
+      (i) => i.brand === inverterBrand && i.kind === inverterKind && i.phase === inverterPhase && i.id === inverterId,
     );
     if (!stillValid && invertersMatchingSystemType.length > 0) {
       const first = invertersMatchingSystemType[0];
       setInverterBrand(first.brand);
+      setInverterKind(first.kind);
       setInverterPhase(first.phase);
       setInverterId(first.id);
     }
@@ -311,17 +344,24 @@ export default function SolarCalculator() {
 
   function handleInverterBrandChange(brand: string) {
     setInverterBrand(brand);
-    const first =
-      invertersMatchingSystemType.find((i) => i.brand === brand && i.phase === inverterPhase) ??
-      invertersMatchingSystemType.find((i) => i.brand === brand);
+    const first = invertersMatchingSystemType.find((i) => i.brand === brand);
     if (first) {
-      setInverterId(first.id);
+      setInverterKind(first.kind);
       setInverterPhase(first.phase);
+      setInverterId(first.id);
+    }
+  }
+  function handleInverterKindChange(kind: InverterKind) {
+    setInverterKind(kind);
+    const first = invertersMatchingSystemType.find((i) => i.brand === inverterBrand && i.kind === kind);
+    if (first) {
+      setInverterPhase(first.phase);
+      setInverterId(first.id);
     }
   }
   function handleInverterPhaseChange(phase: Phase) {
     setInverterPhase(phase);
-    const first = invertersMatchingSystemType.find((i) => i.brand === inverterBrand && i.phase === phase);
+    const first = invertersMatchingSystemType.find((i) => i.brand === inverterBrand && i.kind === inverterKind && i.phase === phase);
     if (first) setInverterId(first.id);
   }
   function handleBatteryBrandChange(brand: string) {
@@ -931,16 +971,35 @@ export default function SolarCalculator() {
                 </select>
               </div>
               <div>
+                <Label>Loại inverter</Label>
+                <select
+                  value={inverterKind}
+                  onChange={(e) => handleInverterKindChange(e.target.value as InverterKind)}
+                  disabled={kindsForBrand.length === 0}
+                  className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10 disabled:bg-surface disabled:text-ink/40"
+                >
+                  {kindsForBrand.length === 0 && <option value="">Chưa có dữ liệu</option>}
+                  {kindsForBrand.map((k) => (
+                    <option key={k} value={k}>
+                      {KIND_LABEL[k]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <Label>Số pha</Label>
                 <select
                   value={inverterPhase}
                   onChange={(e) => handleInverterPhaseChange(e.target.value as Phase)}
-                  className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
+                  disabled={phasesForBrandKind.length === 0}
+                  className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10 disabled:bg-surface disabled:text-ink/40"
                 >
-                  <option value="1_pha">{PHASE_LABEL["1_pha"]}</option>
-                  <option value="3_pha">{PHASE_LABEL["3_pha"]}</option>
-                  <option value="3_pha_lv">{PHASE_LABEL["3_pha_lv"]}</option>
-                  <option value="3_pha_hv">{PHASE_LABEL["3_pha_hv"]}</option>
+                  {phasesForBrandKind.length === 0 && <option value="">Chưa có dữ liệu</option>}
+                  {phasesForBrandKind.map((p) => (
+                    <option key={p} value={p}>
+                      {PHASE_LABEL[p]}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -948,10 +1007,11 @@ export default function SolarCalculator() {
                 <select
                   value={inverterId}
                   onChange={(e) => setInverterId(e.target.value)}
-                  className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
+                  disabled={invertersForBrandKindPhase.length === 0}
+                  className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10 disabled:bg-surface disabled:text-ink/40"
                 >
-                  {invertersForBrand.length === 0 && <option value="">Không có model phù hợp</option>}
-                  {invertersForBrand.map((inv) => (
+                  {invertersForBrandKindPhase.length === 0 && <option value="">Không có model phù hợp</option>}
+                  {invertersForBrandKindPhase.map((inv) => (
                     <option key={inv.id} value={inv.id}>
                       {inv.capacityKw} kW
                     </option>
