@@ -1058,28 +1058,41 @@ export default function SolarCalculator() {
 
           {equipment && selectedPanel && selectedInverter && (
             <div className="mt-4 rounded-2xl border border-line bg-white p-5">
-              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-4">
-                <Row
-                  label={`Tấm pin (${equipment.panelAreaM2} m²/tấm)`}
-                  valueNode={
-                    <span className="flex items-center gap-1.5 font-mono font-medium">
-                      <input
-                        type="number"
-                        min={0}
-                        value={panelCountManual}
-                        onChange={(e) => setPanelCountManual(Math.max(0, Number(e.target.value) || 0))}
-                        className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono"
-                      />
-                      tấm
-                    </span>
-                  }
-                />
+              <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-4">
+                <div>
+                  <Row
+                    label={`Tấm pin (${equipment.panelAreaM2} m²/tấm)`}
+                    valueNode={
+                      <span className="flex items-center gap-1.5 font-mono font-medium">
+                        <input
+                          type="number"
+                          min={0}
+                          value={panelCountManual}
+                          onChange={(e) => setPanelCountManual(Math.max(0, Number(e.target.value) || 0))}
+                          className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono"
+                        />
+                        tấm
+                      </span>
+                    }
+                  />
+                  <p className="mt-1.5 text-[11px] text-ink/40">
+                    Gợi ý: {suggestedPanelCount} tấm ≈ {round1((suggestedPanelCount * selectedPanel.wattage) / 1000)} kWp
+                  </p>
+                </div>
                 <Row label="Diện tích mái cần lắp" value={`${equipment.installedAreaM2} m²`} accent="#F4B63F" />
-                <Row label="Inverter" value={`${selectedInverter.capacityKw} kW · ${PHASE_LABEL[selectedInverter.phase]}`} />
-                {equipment.batteryModuleCount !== null && <Row label="Pin lưu trữ" value={`${equipment.batteryModuleCount} module`} />}
+                <div>
+                  <Row label="Inverter" value={`${selectedInverter.capacityKw} kW · ${PHASE_LABEL[selectedInverter.phase]}`} />
+                  <p className="mt-1.5 text-[11px] text-ink/40">Gợi ý: ~{round1(result.inverterSizeKw)} kW</p>
+                </div>
+                {equipment.batteryModuleCount !== null && (
+                  <div>
+                    <Row label="Pin lưu trữ" value={`${equipment.batteryModuleCount} module`} />
+                    <p className="mt-1.5 text-[11px] text-ink/40">Gợi ý: ~{round1(result.batteryCapacityKwh ?? 0)} kWh</p>
+                  </div>
+                )}
               </div>
               <p className="mt-3 text-[12px] text-ink/45">
-                Số tấm pin gợi ý theo công suất đề xuất ({suggestedPanelCount} tấm) — có thể sửa lại số lượng thực tế, các giá trị khác sẽ tự tính lại theo số tấm đã chọn.
+                Các gợi ý trên tính theo công suất đề xuất ({result.pvSizeKwp} kWp) — có thể chọn/sửa lại thiết bị thực tế ở trên, các giá trị khác sẽ tự tính lại theo lựa chọn đã chọn.
               </p>
             </div>
           )}
