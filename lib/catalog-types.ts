@@ -8,16 +8,17 @@ export interface PanelSpec {
 }
 
 /**
- * Số pha của inverter. 3 pha được tách LV/HV vì đây là 2 dòng sản phẩm khác nhau thực sự
- * (kiến trúc điện áp DC khác nhau, giá khác nhau ở cùng công suất kW) — không phải 1 sản phẩm
- * ghi 2 kiểu, nên KHÔNG được gộp lại khi kiểm tra trùng dữ liệu.
+ * Số pha của inverter. Một số hãng (vd. Solis) bán 3 pha thành 2 dòng LV/HV — cùng kW nhưng
+ * giá khác nhau thật sự, nên có 2 giá trị riêng để không gộp nhầm khi kiểm tra trùng dữ liệu.
+ * Hãng nào chỉ có 1 dòng 3 pha (không phân biệt LV/HV) thì dùng "3_pha" bình thường.
  */
-export type Phase = "1_pha" | "3_pha_lv" | "3_pha_hv";
+export type Phase = "1_pha" | "3_pha" | "3_pha_lv" | "3_pha_hv";
 /** Nhóm pha ở mức thô — dùng cho những chỗ chỉ cần phân biệt 1 pha / 3 pha (vd. giá tủ điện). */
 export type PhaseGroup = "1_pha" | "3_pha";
 
 export const PHASE_LABEL: Record<Phase, string> = {
   "1_pha": "1 pha",
+  "3_pha": "3 pha",
   "3_pha_lv": "3 pha LV",
   "3_pha_hv": "3 pha HV",
 };
@@ -26,10 +27,9 @@ export function phaseGroup(phase: Phase): PhaseGroup {
   return phase === "1_pha" ? "1_pha" : "3_pha";
 }
 
-/** Chuẩn hoá giá trị phase đọc từ dữ liệu cũ/không rõ nguồn về 1 trong 3 giá trị hợp lệ. */
+/** Chuẩn hoá giá trị phase đọc từ dữ liệu cũ/không rõ nguồn về 1 trong các giá trị hợp lệ. */
 export function normalizePhase(value: unknown): Phase {
-  if (value === "1_pha" || value === "3_pha_lv" || value === "3_pha_hv") return value;
-  if (value === "3_pha") return "3_pha_lv"; // dữ liệu lưu trước khi tách LV/HV
+  if (value === "1_pha" || value === "3_pha" || value === "3_pha_lv" || value === "3_pha_hv") return value;
   return "1_pha";
 }
 

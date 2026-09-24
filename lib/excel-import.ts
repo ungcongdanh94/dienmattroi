@@ -21,8 +21,9 @@ function parseNumber(v: unknown): number | null {
 }
 
 /**
- * "3 pha" một mình là mơ hồ — LV và HV là 2 dòng sản phẩm khác nhau, giá khác nhau ở cùng kW,
- * nên bắt buộc ghi rõ LV/HV trong cột Số pha (vd. "3 pha LV", "3 pha HV") để không gộp nhầm 2 sản phẩm.
+ * "3 pha LV"/"3 pha HV" chỉ áp dụng cho hãng có tách riêng 2 dòng giá khác nhau ở cùng kW
+ * (vd. Solis) — ghi rõ LV/HV thì nhận đúng dòng đó. Hãng nào chỉ có 1 dòng 3 pha thì ghi
+ * "3 pha" bình thường, không bắt buộc phải ghi LV/HV.
  */
 function parsePhase(v: unknown): Phase | null {
   const n = normalizeVi(v);
@@ -30,7 +31,7 @@ function parsePhase(v: unknown): Phase | null {
   if (n.includes("3pha")) {
     if (n.includes("hv")) return "3_pha_hv";
     if (n.includes("lv")) return "3_pha_lv";
-    return null;
+    return "3_pha";
   }
   return null;
 }
@@ -116,19 +117,14 @@ export function parseInverterRows(
   rawRows.forEach((row, idx) => {
     const rowNum = idx + 2;
     const brand = String(getCell(row, "thuonghieu") ?? "").trim();
-    const phaseRaw = getCell(row, "sopha");
-    const phase = parsePhase(phaseRaw);
+    const phase = parsePhase(getCell(row, "sopha"));
     const kind = parseKind(getCell(row, "loai"));
     const capacityKw = parseNumber(getCell(row, "congsuatkw", "congsuat"));
     const priceVnd = parseNumber(getCell(row, "giabo", "gia"));
 
-    if (!phase && normalizeVi(phaseRaw).includes("3pha")) {
-      errors.push(`Dòng ${rowNum}: cột Số pha ghi "${phaseRaw}" chưa rõ LV hay HV — ghi rõ "3 pha LV" hoặc "3 pha HV" (2 dòng giá khác nhau).`);
-      return;
-    }
     if (!brand || !phase || !kind || capacityKw === null || priceVnd === null) {
       errors.push(
-        `Dòng ${rowNum}: thiếu hoặc sai dữ liệu (cần Thương hiệu, Loại [Hoà lưới/Hybrid/Off-grid], Số pha [1 pha / 3 pha LV / 3 pha HV], Công suất (kW), Giá / bộ).`,
+        `Dòng ${rowNum}: thiếu hoặc sai dữ liệu (cần Thương hiệu, Loại [Hoà lưới/Hybrid/Off-grid], Số pha [1 pha / 3 pha / 3 pha LV / 3 pha HV], Công suất (kW), Giá / bộ).`,
       );
       return;
     }
@@ -195,8 +191,9 @@ export function downloadTemplate(kind: "panels" | "inverters" | "batteries") {
     headers = ["Thương hiệu", "Loại", "Số pha", "Công suất (kW)", "Giá / bộ"];
     sample = [
       ["Deye", "Hybrid", "1 pha", 5, 25000000],
-      ["Deye", "Hybrid", "3 pha LV", 10, 48000000],
-      ["Deye", "Hybrid", "3 pha HV", 10, 40000000],
+      ["Deye", "Hybrid", "3 pha", 10, 45000000],
+      ["Solis", "Hybrid", "3 pha LV", 10, 48698000],
+      ["Solis", "Hybrid", "3 pha HV", 10, 39934000],
     ];
     filename = "mau-inverter.xlsx";
   } else {

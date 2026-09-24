@@ -938,6 +938,7 @@ export default function SolarCalculator() {
                   className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
                 >
                   <option value="1_pha">{PHASE_LABEL["1_pha"]}</option>
+                  <option value="3_pha">{PHASE_LABEL["3_pha"]}</option>
                   <option value="3_pha_lv">{PHASE_LABEL["3_pha_lv"]}</option>
                   <option value="3_pha_hv">{PHASE_LABEL["3_pha_hv"]}</option>
                 </select>

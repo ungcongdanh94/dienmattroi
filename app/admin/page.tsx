@@ -365,6 +365,7 @@ export default function AdminPage() {
                             className="w-28 rounded-md border border-line px-2 py-1"
                           >
                             <option value="1_pha">{PHASE_LABEL["1_pha"]}</option>
+                            <option value="3_pha">{PHASE_LABEL["3_pha"]}</option>
                             <option value="3_pha_lv">{PHASE_LABEL["3_pha_lv"]}</option>
                             <option value="3_pha_hv">{PHASE_LABEL["3_pha_hv"]}</option>
                           </select>
