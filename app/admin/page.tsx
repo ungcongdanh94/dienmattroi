@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { EquipmentCatalog, PanelSpec, InverterSpec, BatterySpec } from "@/lib/catalog-types";
+import { PHASE_LABEL, type EquipmentCatalog, type PanelSpec, type InverterSpec, type BatterySpec } from "@/lib/catalog-types";
 import type { ProjectEntry } from "@/lib/projects-store";
 import type { QuoteRecord } from "@/lib/quotes-store";
 import { readExcelRows, parsePanelRows, parseInverterRows, parseBatteryRows, downloadTemplate } from "@/lib/excel-import";
@@ -362,10 +362,11 @@ export default function AdminPage() {
                           <select
                             value={inv.phase}
                             onChange={(e) => updateInverter(inv.id, { phase: e.target.value as InverterSpec["phase"] })}
-                            className="w-24 rounded-md border border-line px-2 py-1"
+                            className="w-28 rounded-md border border-line px-2 py-1"
                           >
-                            <option value="1_pha">1 pha</option>
-                            <option value="3_pha">3 pha</option>
+                            <option value="1_pha">{PHASE_LABEL["1_pha"]}</option>
+                            <option value="3_pha_lv">{PHASE_LABEL["3_pha_lv"]}</option>
+                            <option value="3_pha_hv">{PHASE_LABEL["3_pha_hv"]}</option>
                           </select>
                         </td>
                         <td className="py-2 pr-2">

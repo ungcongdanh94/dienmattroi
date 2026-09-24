@@ -7,7 +7,31 @@ export interface PanelSpec {
   priceVnd: number;
 }
 
-export type Phase = "1_pha" | "3_pha";
+/**
+ * Số pha của inverter. 3 pha được tách LV/HV vì đây là 2 dòng sản phẩm khác nhau thực sự
+ * (kiến trúc điện áp DC khác nhau, giá khác nhau ở cùng công suất kW) — không phải 1 sản phẩm
+ * ghi 2 kiểu, nên KHÔNG được gộp lại khi kiểm tra trùng dữ liệu.
+ */
+export type Phase = "1_pha" | "3_pha_lv" | "3_pha_hv";
+/** Nhóm pha ở mức thô — dùng cho những chỗ chỉ cần phân biệt 1 pha / 3 pha (vd. giá tủ điện). */
+export type PhaseGroup = "1_pha" | "3_pha";
+
+export const PHASE_LABEL: Record<Phase, string> = {
+  "1_pha": "1 pha",
+  "3_pha_lv": "3 pha LV",
+  "3_pha_hv": "3 pha HV",
+};
+
+export function phaseGroup(phase: Phase): PhaseGroup {
+  return phase === "1_pha" ? "1_pha" : "3_pha";
+}
+
+/** Chuẩn hoá giá trị phase đọc từ dữ liệu cũ/không rõ nguồn về 1 trong 3 giá trị hợp lệ. */
+export function normalizePhase(value: unknown): Phase {
+  if (value === "1_pha" || value === "3_pha_lv" || value === "3_pha_hv") return value;
+  if (value === "3_pha") return "3_pha_lv"; // dữ liệu lưu trước khi tách LV/HV
+  return "1_pha";
+}
 
 /** Loại inverter theo cách hệ thống hoạt động — khớp với SystemType ở lib/solar-calculator.ts */
 export type InverterKind = "on_grid" | "hybrid" | "off_grid";
@@ -30,7 +54,8 @@ export interface BatterySpec {
 
 export interface CabinetPriceTier {
   id: string;
-  phase: Phase;
+  /** Giá tủ điện chỉ phụ thuộc 1 pha / 3 pha (không phân biệt LV/HV). */
+  phase: PhaseGroup;
   minKwp: number;
   maxKwp: number;
   priceVnd: number;
@@ -84,10 +109,11 @@ export function findCabinetTier(
   phase: Phase,
   pvSizeKwp: number,
 ): CabinetPriceTier | null {
-  const exact = tiers.find((t) => t.phase === phase && pvSizeKwp >= t.minKwp && pvSizeKwp <= t.maxKwp);
+  const group = phaseGroup(phase);
+  const exact = tiers.find((t) => t.phase === group && pvSizeKwp >= t.minKwp && pvSizeKwp <= t.maxKwp);
   if (exact) return exact;
   // Không khớp khoảng nào — lấy mức gần nhất cùng pha để không bỏ trống giá
-  const samePhase = tiers.filter((t) => t.phase === phase);
+  const samePhase = tiers.filter((t) => t.phase === group);
   if (samePhase.length === 0) return null;
   return samePhase.reduce((closest, t) => {
     const distClosest = pvSizeKwp < closest.minKwp ? closest.minKwp - pvSizeKwp : pvSizeKwp - closest.maxKwp;

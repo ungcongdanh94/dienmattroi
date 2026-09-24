@@ -9,6 +9,7 @@ import {
 } from "@/lib/solar-calculator";
 import {
   MOUNTING_FACTOR,
+  PHASE_LABEL,
   computeEquipmentSelection,
   findCabinetTier,
   type MountingType,
@@ -16,6 +17,7 @@ import {
   type PanelSpec,
   type InverterSpec,
   type BatterySpec,
+  type Phase,
 } from "@/lib/catalog-types";
 import {
   EVN_TARIFF_2026,
@@ -102,7 +104,7 @@ export default function SolarCalculator() {
   const [panelBrand, setPanelBrand] = useState<string>(FALLBACK_CATALOG.panels[0].brand);
   const [panelId, setPanelId] = useState<string>(FALLBACK_CATALOG.panels[0].id);
   const [inverterBrand, setInverterBrand] = useState<string>(FALLBACK_CATALOG.inverters[0].brand);
-  const [inverterPhase, setInverterPhase] = useState<"1_pha" | "3_pha">(FALLBACK_CATALOG.inverters[0].phase);
+  const [inverterPhase, setInverterPhase] = useState<Phase>(FALLBACK_CATALOG.inverters[0].phase);
   const [inverterId, setInverterId] = useState<string>(FALLBACK_CATALOG.inverters[0].id);
   const [batteryBrand, setBatteryBrand] = useState<string>(FALLBACK_CATALOG.batteries[0].brand);
   const [batteryId, setBatteryId] = useState<string>(FALLBACK_CATALOG.batteries[0].id);
@@ -317,7 +319,7 @@ export default function SolarCalculator() {
       setInverterPhase(first.phase);
     }
   }
-  function handleInverterPhaseChange(phase: "1_pha" | "3_pha") {
+  function handleInverterPhaseChange(phase: Phase) {
     setInverterPhase(phase);
     const first = invertersMatchingSystemType.find((i) => i.brand === inverterBrand && i.phase === phase);
     if (first) setInverterId(first.id);
@@ -378,7 +380,7 @@ export default function SolarCalculator() {
       },
       {
         id: "inverter",
-        label: `Inverter ${selectedInverter.capacityKw}kW ${selectedInverter.phase === "1_pha" ? "1 pha" : "3 pha"}`,
+        label: `Inverter ${selectedInverter.capacityKw}kW ${PHASE_LABEL[selectedInverter.phase]}`,
         brandModel: selectedInverter.brand,
         qty: 1,
         unit: "bộ",
@@ -411,7 +413,7 @@ export default function SolarCalculator() {
         id: "ac_dc_cabinet",
         label: "Tủ điện AC/DC",
         brandModel: selectedInverter
-          ? `${selectedInverter.phase === "1_pha" ? "1 pha" : "3 pha"} · ${round1(actualCapacityKwp)} kWp`
+          ? `${PHASE_LABEL[selectedInverter.phase]} · ${round1(actualCapacityKwp)} kWp`
           : "-",
         qty: 1,
         unit: "hệ",
@@ -932,11 +934,12 @@ export default function SolarCalculator() {
                 <Label>Số pha</Label>
                 <select
                   value={inverterPhase}
-                  onChange={(e) => handleInverterPhaseChange(e.target.value as "1_pha" | "3_pha")}
+                  onChange={(e) => handleInverterPhaseChange(e.target.value as Phase)}
                   className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
                 >
-                  <option value="1_pha">1 pha</option>
-                  <option value="3_pha">3 pha</option>
+                  <option value="1_pha">{PHASE_LABEL["1_pha"]}</option>
+                  <option value="3_pha_lv">{PHASE_LABEL["3_pha_lv"]}</option>
+                  <option value="3_pha_hv">{PHASE_LABEL["3_pha_hv"]}</option>
                 </select>
               </div>
               <div>
@@ -1011,7 +1014,7 @@ export default function SolarCalculator() {
                   }
                 />
                 <Row label="Diện tích mái cần lắp" value={`${equipment.installedAreaM2} m²`} accent="#F4B63F" />
-                <Row label="Inverter" value={`${selectedInverter.capacityKw} kW · ${selectedInverter.phase === "1_pha" ? "1 pha" : "3 pha"}`} />
+                <Row label="Inverter" value={`${selectedInverter.capacityKw} kW · ${PHASE_LABEL[selectedInverter.phase]}`} />
                 {equipment.batteryModuleCount !== null && <Row label="Pin lưu trữ" value={`${equipment.batteryModuleCount} module`} />}
               </div>
               <p className="mt-3 text-[12px] text-ink/45">

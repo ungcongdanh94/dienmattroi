@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import type { PanelSpec, InverterSpec, BatterySpec, Phase, InverterKind } from "./catalog-types";
+import { PHASE_LABEL, type PanelSpec, type InverterSpec, type BatterySpec, type Phase, type InverterKind } from "./catalog-types";
 
 /** Bỏ dấu tiếng Việt, chữ thường, bỏ khoảng trắng/ký tự đặc biệt — dùng để so khớp tiêu đề cột và giá trị linh hoạt. */
 export function normalizeVi(s: unknown): string {
@@ -20,10 +20,18 @@ function parseNumber(v: unknown): number | null {
   return Number.isNaN(num) ? null : num;
 }
 
+/**
+ * "3 pha" một mình là mơ hồ — LV và HV là 2 dòng sản phẩm khác nhau, giá khác nhau ở cùng kW,
+ * nên bắt buộc ghi rõ LV/HV trong cột Số pha (vd. "3 pha LV", "3 pha HV") để không gộp nhầm 2 sản phẩm.
+ */
 function parsePhase(v: unknown): Phase | null {
   const n = normalizeVi(v);
   if (n.includes("1pha")) return "1_pha";
-  if (n.includes("3pha")) return "3_pha";
+  if (n.includes("3pha")) {
+    if (n.includes("hv")) return "3_pha_hv";
+    if (n.includes("lv")) return "3_pha_lv";
+    return null;
+  }
   return null;
 }
 
@@ -108,21 +116,26 @@ export function parseInverterRows(
   rawRows.forEach((row, idx) => {
     const rowNum = idx + 2;
     const brand = String(getCell(row, "thuonghieu") ?? "").trim();
-    const phase = parsePhase(getCell(row, "sopha"));
+    const phaseRaw = getCell(row, "sopha");
+    const phase = parsePhase(phaseRaw);
     const kind = parseKind(getCell(row, "loai"));
     const capacityKw = parseNumber(getCell(row, "congsuatkw", "congsuat"));
     const priceVnd = parseNumber(getCell(row, "giabo", "gia"));
 
+    if (!phase && normalizeVi(phaseRaw).includes("3pha")) {
+      errors.push(`Dòng ${rowNum}: cột Số pha ghi "${phaseRaw}" chưa rõ LV hay HV — ghi rõ "3 pha LV" hoặc "3 pha HV" (2 dòng giá khác nhau).`);
+      return;
+    }
     if (!brand || !phase || !kind || capacityKw === null || priceVnd === null) {
       errors.push(
-        `Dòng ${rowNum}: thiếu hoặc sai dữ liệu (cần Thương hiệu, Loại [Hoà lưới/Hybrid/Off-grid], Số pha [1 pha/3 pha], Công suất (kW), Giá / bộ).`,
+        `Dòng ${rowNum}: thiếu hoặc sai dữ liệu (cần Thương hiệu, Loại [Hoà lưới/Hybrid/Off-grid], Số pha [1 pha / 3 pha LV / 3 pha HV], Công suất (kW), Giá / bộ).`,
       );
       return;
     }
 
     const key = `${normalizeVi(brand)}|${phase}|${kind}|${capacityKw}`;
     if (existingKeys.has(key)) {
-      errors.push(`Dòng ${rowNum}: "${brand} ${capacityKw}kW (${phase === "1_pha" ? "1 pha" : "3 pha"})" đã có sẵn trong bảng giá.`);
+      errors.push(`Dòng ${rowNum}: "${brand} ${capacityKw}kW (${PHASE_LABEL[phase]})" đã có sẵn trong bảng giá.`);
       return;
     }
     if (seenKeys.has(key)) {
@@ -180,7 +193,11 @@ export function downloadTemplate(kind: "panels" | "inverters" | "batteries") {
     filename = "mau-tam-pin.xlsx";
   } else if (kind === "inverters") {
     headers = ["Thương hiệu", "Loại", "Số pha", "Công suất (kW)", "Giá / bộ"];
-    sample = [["Deye", "Hybrid", "1 pha", 5, 25000000]];
+    sample = [
+      ["Deye", "Hybrid", "1 pha", 5, 25000000],
+      ["Deye", "Hybrid", "3 pha LV", 10, 48000000],
+      ["Deye", "Hybrid", "3 pha HV", 10, 40000000],
+    ];
     filename = "mau-inverter.xlsx";
   } else {
     headers = ["Thương hiệu", "Dung lượng (kWh)", "Giá / module"];
