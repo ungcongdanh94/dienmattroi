@@ -415,6 +415,16 @@ export default function SolarCalculator() {
   // vì thường lớn hơn công suất yêu cầu (result.pvSizeKwp) do làm tròn số tấm lên.
   const actualCapacityKwp = selectedPanel && equipment ? (equipment.panelCount * selectedPanel.wattage) / 1000 : 0;
 
+  // Sản lượng điện THỰC TẾ theo công suất tấm pin đã chọn (số tấm có thể đã sửa tay) —
+  // dùng để tính lại toàn bộ phân tích tài chính (tiết kiệm/hoàn vốn/khấu hao/IRR) thay vì
+  // chỉ dựa theo % bù hoá đơn lý thuyết lúc đầu, vì số tấm thực tế có thể khác công suất đề xuất.
+  const actualMonthlyProductionKwh = actualCapacityKwp * FIXED_PEAK_SUN_HOURS * 30;
+  // Mức bù hoá đơn THỰC TẾ (giới hạn tối đa 100%) suy ra từ sản lượng thực tế so với tiêu thụ.
+  const effectiveOffsetPercent =
+    systemType !== "off_grid" && monthlyKwh > 0
+      ? Math.min(100, round1((actualMonthlyProductionKwh / monthlyKwh) * 100))
+      : offsetPercent;
+
   useEffect(() => {
     if (!actualCapacityKwp) return;
     setDcCableM(Math.max(1, Math.round(actualCapacityKwp * catalog.otherPricing.dcCableMetersPerKwp)));
@@ -489,7 +499,7 @@ export default function SolarCalculator() {
   const sub = subtotal(items);
   const totalPayment = totalAfterDiscount(sub, discountPercent);
 
-  const savingsPerMonth = monthlySavingsVnd({ systemType, currentBillVnd: estimatedBillVnd, offsetPercent });
+  const savingsPerMonth = monthlySavingsVnd({ systemType, currentBillVnd: estimatedBillVnd, offsetPercent: effectiveOffsetPercent });
   const savingsPerYear = savingsPerMonth * 12;
   const paybackYears = simplePaybackYears(totalPayment, savingsPerMonth);
   const loan = calculateLoan({ totalInvestmentVnd: totalPayment, loanPercent, interestRatePercent, annualSavingsVnd: savingsPerYear });
@@ -526,7 +536,7 @@ export default function SolarCalculator() {
   const priceVndPerKwh = monthlyKwh > 0 ? Math.round(estimatedBillVnd / monthlyKwh) : 0;
   const projection10Y = project10YearSavings(priceVndPerKwh, savingsPerYear, inflationPercent);
 
-  const annualProductionKwh = systemType === "off_grid" ? monthlyKwh * 12 : monthlyKwh * 12 * (offsetPercent / 100);
+  const annualProductionKwh = systemType === "off_grid" ? monthlyKwh * 12 : monthlyKwh * 12 * (effectiveOffsetPercent / 100);
   const carbon = calculateCarbon(annualProductionKwh, carbonPriceUsd, usdVndRate);
 
   async function handleExport(kind: "png" | "pdf") {
@@ -1299,8 +1309,12 @@ export default function SolarCalculator() {
         {/* Financial analysis */}
         <section className="mt-8">
           <h2 className="font-display text-lg font-semibold text-navy">Phân tích tài chính</h2>
+          <p className="mt-1 text-xs text-ink/45">
+            Tính theo công suất tấm pin THỰC TẾ đã chọn ({round1(actualCapacityKwp)} kWp
+            {systemType !== "off_grid" ? ` · mức bù hoá đơn thực tế ≈ ${effectiveOffsetPercent}%` : ""}) — sửa số lượng tấm pin/inverter/pin lưu trữ ở trên sẽ tự cập nhật lại các số liệu bên dưới.
+          </p>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <MetricCard label="Sản lượng bù/tháng" value={`${Math.round(monthlyKwh * (systemType === "off_grid" ? 1 : offsetPercent / 100))} kWh`} />
+            <MetricCard label="Sản lượng bù/tháng" value={`${Math.round(monthlyKwh * (systemType === "off_grid" ? 1 : effectiveOffsetPercent / 100))} kWh`} />
             <MetricCard label="Tiết kiệm/tháng" value={vnd(savingsPerMonth)} accent="#2F8F5B" />
             <MetricCard label="Tổng đầu tư" value={vnd(totalPayment)} />
             <MetricCard label="Hoàn vốn" value={paybackYears === Infinity ? "—" : `${paybackYears} năm`} accent="#E8A33D" />
