@@ -117,6 +117,8 @@ export default function SolarCalculator() {
   const [batteryBrand, setBatteryBrand] = useState<string>(FALLBACK_CATALOG.batteries[0].brand);
   const [batteryId, setBatteryId] = useState<string>(FALLBACK_CATALOG.batteries[0].id);
   const [panelCountManual, setPanelCountManual] = useState<number>(0);
+  const [inverterCountManual, setInverterCountManual] = useState<number>(1);
+  const [batteryCountManual, setBatteryCountManual] = useState<number>(0);
 
   useEffect(() => {
     fetch("/api/catalog")
@@ -379,6 +381,18 @@ export default function SolarCalculator() {
     setPanelCountManual(suggestedPanelCount);
   }, [suggestedPanelCount]);
 
+  // Số module pin lưu trữ GỢI Ý theo dung lượng đề xuất — chỉ là điểm khởi đầu, khách hàng có thể sửa lại số lượng tuỳ ý.
+  const suggestedBatteryCount = useMemo(
+    () =>
+      selectedBattery && result.batteryCapacityKwh !== null
+        ? Math.ceil(result.batteryCapacityKwh / selectedBattery.moduleKwh)
+        : 0,
+    [selectedBattery, result.batteryCapacityKwh],
+  );
+  useEffect(() => {
+    setBatteryCountManual(suggestedBatteryCount);
+  }, [suggestedBatteryCount]);
+
   const equipment = useMemo(() => {
     if (!selectedPanel) return null;
     const base = computeEquipmentSelection(
@@ -392,8 +406,10 @@ export default function SolarCalculator() {
     const panelAreaM2 = Math.round(((selectedPanel.lengthMm / 1000) * (selectedPanel.widthMm / 1000)) * 100) / 100;
     const footprintAreaM2 = Math.round(panelCount * panelAreaM2 * 100) / 100;
     const installedAreaM2 = Math.round(footprintAreaM2 * MOUNTING_FACTOR[mountingType].factor * 100) / 100;
-    return { ...base, panelCount, panelAreaM2, footprintAreaM2, installedAreaM2 };
-  }, [selectedPanel, selectedBattery, result, mountingType, panelCountManual]);
+    const batteryModuleCount =
+      result.batteryCapacityKwh !== null && selectedBattery ? Math.max(0, batteryCountManual) : null;
+    return { ...base, panelCount, panelAreaM2, footprintAreaM2, installedAreaM2, batteryModuleCount };
+  }, [selectedPanel, selectedBattery, result, mountingType, panelCountManual, batteryCountManual]);
 
   // Công suất THỰC LẮP (số tấm × công suất/tấm) — dùng cho khung/cáp/tủ điện/nhân công,
   // vì thường lớn hơn công suất yêu cầu (result.pvSizeKwp) do làm tròn số tấm lên.
@@ -423,7 +439,7 @@ export default function SolarCalculator() {
         id: "inverter",
         label: `Inverter ${selectedInverter.capacityKw}kW ${PHASE_LABEL[selectedInverter.phase]}`,
         brandModel: selectedInverter.brand,
-        qty: 1,
+        qty: Math.max(0, inverterCountManual),
         unit: "bộ",
         unitPriceVnd: selectedInverter.priceVnd,
         warranty: selectedInverter.warranty,
@@ -468,7 +484,7 @@ export default function SolarCalculator() {
       { id: "shipping", label: "Vận chuyển", brandModel: "-", qty: shippingTrips, unit: "chuyến", unitPriceVnd: op.shippingPerTrip },
     );
     return list;
-  }, [equipment, selectedPanel, selectedInverter, selectedBattery, mountingType, shippingTrips, dcCableM, acCableM, catalog.otherPricing]);
+  }, [equipment, selectedPanel, selectedInverter, selectedBattery, mountingType, shippingTrips, dcCableM, acCableM, catalog.otherPricing, inverterCountManual]);
 
   const sub = subtotal(items);
   const totalPayment = totalAfterDiscount(sub, discountPercent);
@@ -1080,11 +1096,43 @@ export default function SolarCalculator() {
                   }
                 />
                 <Row label="Diện tích mái cần lắp" value={`${equipment.installedAreaM2} m²`} accent="#F4B63F" />
-                <Row label="Inverter" value={`${selectedInverter.capacityKw} kW · ${PHASE_LABEL[selectedInverter.phase]}`} />
-                {equipment.batteryModuleCount !== null && <Row label="Pin lưu trữ" value={`${equipment.batteryModuleCount} module`} />}
+                <Row
+                  label={`Inverter (${selectedInverter.capacityKw} kW · ${PHASE_LABEL[selectedInverter.phase]})`}
+                  valueNode={
+                    <span className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-1 font-mono font-medium">
+                      <input
+                        type="number"
+                        min={0}
+                        value={inverterCountManual}
+                        onChange={(e) => setInverterCountManual(Math.max(0, Number(e.target.value) || 0))}
+                        className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono"
+                      />
+                      <span>bộ</span>
+                    </span>
+                  }
+                />
+                {equipment.batteryModuleCount !== null && selectedBattery && (
+                  <Row
+                    label={`Pin lưu trữ (${selectedBattery.moduleKwh} kWh/module)`}
+                    valueNode={
+                      <span className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-1 font-mono font-medium">
+                        <input
+                          type="number"
+                          min={0}
+                          value={batteryCountManual}
+                          onChange={(e) => setBatteryCountManual(Math.max(0, Number(e.target.value) || 0))}
+                          className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono"
+                        />
+                        <span>module</span>
+                        <span className="text-ink/40">≈</span>
+                        <span style={{ color: "#2F8F5B" }}>{round1(batteryCountManual * selectedBattery.moduleKwh)} kWh</span>
+                      </span>
+                    }
+                  />
+                )}
               </div>
               <p className="mt-3 text-[12px] text-ink/45">
-                Số tấm pin gợi ý theo công suất đề xuất là {suggestedPanelCount} tấm — có thể sửa lại số lượng thực tế, công suất và các giá trị khác sẽ tự cập nhật theo.
+                Số tấm pin gợi ý theo công suất đề xuất là {suggestedPanelCount} tấm, số module pin lưu trữ gợi ý là {suggestedBatteryCount} module — có thể sửa lại số lượng thực tế, công suất và các giá trị khác sẽ tự cập nhật theo.
               </p>
             </div>
           )}
@@ -1158,7 +1206,7 @@ export default function SolarCalculator() {
           {effectiveCustomerView ? (
             <div className="mt-3 overflow-hidden rounded-2xl border border-line bg-white">
               <div className="border-b border-line bg-navy px-6 py-4 text-white">
-                <div className="text-sm text-white/60">Combo: {selectedPanel?.brand} {selectedPanel?.wattage}Wp · {selectedInverter?.brand} {selectedInverter?.capacityKw}kW{selectedBattery && equipment?.batteryModuleCount !== null ? ` · Pin ${selectedBattery.brand}` : ""}</div>
+                <div className="text-sm text-white/60">Combo: {selectedPanel?.brand} {selectedPanel?.wattage}Wp · {selectedInverter?.brand} {inverterCountManual > 1 ? `${inverterCountManual}×` : ""}{selectedInverter?.capacityKw}kW{selectedBattery && equipment?.batteryModuleCount !== null ? ` · Pin ${selectedBattery.brand}` : ""}</div>
                 <div className="mt-1 text-xs text-white/40">Báo giá dự toán, đã bao gồm thiết bị, khung/giá đỡ, dây dẫn, nhân công và vận chuyển.</div>
               </div>
               <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-3">
