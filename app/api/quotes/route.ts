@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     inverterBrand: body.inverterBrand || "",
     batteryBrand: body.batteryBrand || null,
     totalPaymentVnd: Number(body.totalPaymentVnd) || 0,
-    exportKind: body.exportKind === "pdf" ? "pdf" : "png",
+    exportKind: body.exportKind === "pdf" ? "pdf" : body.exportKind === "xlsx" ? "xlsx" : "png",
   };
 
   appendQuote(record);
