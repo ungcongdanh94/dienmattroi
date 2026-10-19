@@ -1399,10 +1399,24 @@ export default function SolarCalculator() {
                 <div className="mt-1 font-mono text-lg font-semibold text-gold">{loan.paybackWithLoanYears === Infinity ? "—" : `${loan.paybackWithLoanYears} năm`}</div>
               </div>
             </div>
-            <p className="mt-3 text-[13px] text-ink/55">
-              Vốn tự có {vnd(loan.ownCapitalVnd)} · Vay {vnd(loan.loanAmountVnd)} · Trả nợ {vnd(loan.annualPaymentVnd)}/năm (gốc + lãi, {loan.termYears} năm) · Tổng lãi phải trả {vnd(loan.totalInterestVnd)} · Dòng tiền còn lại {vnd(loan.netYear1Vnd)}/năm
+            <dl className="mt-4 divide-y divide-line/70 rounded-xl border border-line text-sm">
+              {[
+                { k: "Số tiền vay ngân hàng", v: vnd(loan.loanAmountVnd) },
+                { k: "Vốn tự bỏ ra", v: vnd(loan.ownCapitalVnd) },
+                { k: `Mỗi năm trả ngân hàng (gốc + lãi) — trong ${loan.termYears} năm`, v: vnd(loan.annualPaymentVnd) },
+                { k: "Tổng lãi phải trả cả kỳ hạn", v: vnd(loan.totalInterestVnd), warn: true },
+                { k: "Tiết kiệm tiền điện mỗi năm", v: vnd(savingsPerYear) },
+                { k: "Sau khi trả ngân hàng, mỗi năm còn dư", v: vnd(loan.netYear1Vnd), good: loan.netYear1Vnd > 0, bad: loan.netYear1Vnd <= 0 },
+              ].map((row) => (
+                <div key={row.k} className="flex items-baseline justify-between gap-4 px-4 py-2.5">
+                  <dt className="text-ink/60">{row.k}</dt>
+                  <dd className={`font-mono font-medium ${row.good ? "text-energy" : row.bad ? "text-red-600" : row.warn ? "text-gold" : "text-ink"}`}>{row.v}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-2.5 text-xs text-ink/45">
+              Hoàn vốn (có vay) = thời gian để tiền tiết kiệm điện cộng dồn đủ bù cả tiền đầu tư lẫn lãi vay đã trả. Vay càng nhiều, lãi càng lớn nên hoàn vốn càng lâu. Tính theo tiết kiệm không đổi mỗi năm và trả đều gốc + lãi.
             </p>
-            <p className="mt-1.5 text-xs text-ink/40">Hoàn vốn (có vay) tính trên TỔNG đầu tư cộng lãi vay đã phát sinh: thời điểm tiết kiệm luỹ kế bù được (tổng đầu tư + lãi đã trả). Vay thêm thì lãi làm kéo dài thời gian hoàn vốn so với không vay. Tiết kiệm giữ nguyên mỗi năm, trả đều gốc + lãi theo kỳ hạn.</p>
           </div>
 
           <div className="mt-4 rounded-2xl border border-line bg-white">
