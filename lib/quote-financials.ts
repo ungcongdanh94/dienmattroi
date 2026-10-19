@@ -53,14 +53,23 @@ export interface LoanInput {
   totalInvestmentVnd: number;
   loanPercent: number; // % vay trên tổng đầu tư
   interestRatePercent: number; // %/năm
+  /** Thời hạn vay (năm) — trả đều gốc + lãi hằng năm (annuity) */
+  termYears: number;
   annualSavingsVnd: number;
 }
 
 export interface LoanResult {
   ownCapitalVnd: number;
   loanAmountVnd: number;
+  termYears: number;
+  /** Tiền trả nợ mỗi năm (gốc + lãi) */
+  annualPaymentVnd: number;
   year1InterestVnd: number;
+  /** Tổng lãi phải trả trong suốt kỳ hạn vay */
+  totalInterestVnd: number;
+  /** Tiết kiệm mỗi năm sau khi trừ tiền trả nợ (dòng tiền hằng năm) */
   netYear1Vnd: number;
+  /** Hoàn vốn trên TỔNG đầu tư + lãi vay đã trả (không tính theo vốn tự có) */
   paybackWithLoanYears: number;
 }
 
@@ -68,14 +77,51 @@ export function calculateLoan({
   totalInvestmentVnd,
   loanPercent,
   interestRatePercent,
+  termYears,
   annualSavingsVnd,
 }: LoanInput): LoanResult {
-  const loanAmountVnd = Math.round(totalInvestmentVnd * (loanPercent / 100));
+  const pct = Math.min(Math.max(loanPercent, 0), 100);
+  const years = Math.max(1, Math.round(termYears));
+  const loanAmountVnd = Math.round(totalInvestmentVnd * (pct / 100));
   const ownCapitalVnd = totalInvestmentVnd - loanAmountVnd;
-  const year1InterestVnd = Math.round(loanAmountVnd * (interestRatePercent / 100));
-  const netYear1Vnd = annualSavingsVnd - year1InterestVnd;
-  const paybackWithLoanYears = netYear1Vnd > 0 ? round1(ownCapitalVnd / netYear1Vnd) : Infinity;
-  return { ownCapitalVnd, loanAmountVnd, year1InterestVnd, netYear1Vnd, paybackWithLoanYears };
+  const r = interestRatePercent / 100;
+  const annualPaymentVnd =
+    loanAmountVnd === 0
+      ? 0
+      : r === 0
+        ? Math.round(loanAmountVnd / years)
+        : Math.round((loanAmountVnd * r) / (1 - Math.pow(1 + r, -years)));
+  const year1InterestVnd = Math.round(loanAmountVnd * r);
+  const netYear1Vnd = annualSavingsVnd - annualPaymentVnd;
+
+  // Lịch trả nợ theo năm: lãi từng năm = dư nợ đầu năm × lãi suất; gốc = tiền trả − lãi.
+  const interestByYear: number[] = [];
+  let balance = loanAmountVnd;
+  for (let k = 0; k < years; k++) {
+    const interest = balance * r;
+    interestByYear.push(interest);
+    balance = Math.max(0, balance - (annualPaymentVnd - interest));
+  }
+  const totalInterestVnd = Math.round(interestByYear.reduce((s, x) => s + x, 0));
+
+  // Hoàn vốn = thời điểm tiết kiệm luỹ kế bù được TỔNG đầu tư + lãi vay đã phát sinh đến lúc đó.
+  let paybackWithLoanYears = Infinity;
+  if (annualSavingsVnd > 0) {
+    let cumInterest = 0;
+    for (let k = 1; k <= 60; k++) {
+      const intK = k <= years ? interestByYear[k - 1] : 0;
+      const need = totalInvestmentVnd + cumInterest + intK;
+      if (annualSavingsVnd * k >= need) {
+        // nghiệm tuyến tính trong năm k: S·t = I + cumInterest + intK·(t − (k−1))
+        const denom = annualSavingsVnd - intK;
+        const t = denom > 0 ? (totalInvestmentVnd + cumInterest - intK * (k - 1)) / denom : k;
+        paybackWithLoanYears = round1(Math.min(k, Math.max(k - 1, t)));
+        break;
+      }
+      cumInterest += intK;
+    }
+  }
+  return { ownCapitalVnd, loanAmountVnd, termYears: years, annualPaymentVnd, year1InterestVnd, totalInterestVnd, netYear1Vnd, paybackWithLoanYears };
 }
 
 // ---------- Khấu hao tài sản (đường thẳng) ----------
