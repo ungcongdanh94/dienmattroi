@@ -153,6 +153,7 @@ export default function SolarCalculator() {
 
   const [loanPercent, setLoanPercent] = useState<number>(70);
   const [interestRatePercent, setInterestRatePercent] = useState<number>(9);
+  const [loanTermYears, setLoanTermYears] = useState<number>(10);
   const [depreciationYears, setDepreciationYears] = useState<number>(10);
   const [inflationPercent, setInflationPercent] = useState<number>(5);
   const [bankSavingsRatePercent, setBankSavingsRatePercent] = useState<number>(5);
@@ -504,7 +505,7 @@ export default function SolarCalculator() {
   const savingsPerMonth = monthlySavingsVnd({ systemType, currentBillVnd: estimatedBillVnd, offsetPercent: effectiveOffsetPercent });
   const savingsPerYear = savingsPerMonth * 12;
   const paybackYears = simplePaybackYears(totalPayment, savingsPerMonth);
-  const loan = calculateLoan({ totalInvestmentVnd: totalPayment, loanPercent, interestRatePercent, annualSavingsVnd: savingsPerYear });
+  const loan = calculateLoan({ totalInvestmentVnd: totalPayment, loanPercent, interestRatePercent, termYears: loanTermYears, annualSavingsVnd: savingsPerYear });
 
   const hasBatteryItem = items.some((it) => it.id === "battery");
   const depreciationRows = calculateDepreciation(
@@ -821,20 +822,18 @@ export default function SolarCalculator() {
               {autoSync ? (
                 <>
                   <Label className="mt-4">Hoá đơn trung bình / tháng (đã gồm VAT)</Label>
-                  <input
-                    type="number"
+                  <NumInput
                     min={0}
                     step={1000}
                     value={monthlyBillVnd}
-                    onChange={(e) => handleBillChange(Number(e.target.value) || 0)}
+                    onChange={(v) => handleBillChange(v || 0)}
                     className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 font-mono text-lg focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
                   />
                   <Label className="mt-4">Sản lượng trung bình / tháng (kWh)</Label>
-                  <input
-                    type="number"
+                  <NumInput
                     min={0}
                     value={monthlyKwhRaw}
-                    onChange={(e) => handleKwhChange(Number(e.target.value) || 0)}
+                    onChange={(v) => handleKwhChange(v || 0)}
                     className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 font-mono text-lg focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
                   />
                   <p className="mt-1.5 text-[13px] text-ink/50">Biểu giá hiệu lực từ {tariff.effectiveFrom} · gõ vào 1 ô, ô còn lại tự cập nhật.</p>
@@ -849,12 +848,11 @@ export default function SolarCalculator() {
                   {inputMode === "bill" ? (
                     <>
                       <Label className="mt-4">Hoá đơn trung bình / tháng (đã gồm VAT)</Label>
-                      <input
-                        type="number"
+                      <NumInput
                         min={0}
                         step={1000}
                         value={monthlyBillVnd}
-                        onChange={(e) => setMonthlyBillVnd(Number(e.target.value) || 0)}
+                        onChange={(v) => setMonthlyBillVnd(v || 0)}
                         className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 font-mono text-lg focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
                       />
                       <p className="mt-1.5 text-[13px] text-ink/50">
@@ -864,11 +862,10 @@ export default function SolarCalculator() {
                   ) : (
                     <>
                       <Label className="mt-4">Sản lượng trung bình / tháng</Label>
-                      <input
-                        type="number"
+                      <NumInput
                         min={0}
                         value={monthlyKwhRaw}
-                        onChange={(e) => setMonthlyKwhRaw(Number(e.target.value) || 0)}
+                        onChange={(v) => setMonthlyKwhRaw(v || 0)}
                         className="mt-2 w-full rounded-lg border border-line px-3.5 py-2.5 font-mono text-lg focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
                       />
                       <p className="mt-1.5 text-[13px] text-ink/50">≈ <span className="font-mono text-ink/70">{vnd(estimatedBillVnd)}</span>/tháng</p>
@@ -1170,11 +1167,10 @@ export default function SolarCalculator() {
                   label={`Tấm pin (${equipment.panelAreaM2} m²/tấm)`}
                   valueNode={
                     <span className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-1 font-mono font-medium">
-                      <input
-                        type="number"
+                      <NumInput
                         min={0}
                         value={panelCountManual}
-                        onChange={(e) => setPanelCountManual(Math.max(0, Number(e.target.value) || 0))}
+                        onChange={(v) => setPanelCountManual(Math.max(0, v || 0))}
                         className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono"
                       />
                       <span>tấm</span>
@@ -1188,11 +1184,10 @@ export default function SolarCalculator() {
                   label={`Inverter (${selectedInverter.capacityKw} kW · ${PHASE_LABEL[selectedInverter.phase]})`}
                   valueNode={
                     <span className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-1 font-mono font-medium">
-                      <input
-                        type="number"
+                      <NumInput
                         min={0}
                         value={inverterCountManual}
-                        onChange={(e) => setInverterCountManual(Math.max(0, Number(e.target.value) || 0))}
+                        onChange={(v) => setInverterCountManual(Math.max(0, v || 0))}
                         className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono"
                       />
                       <span>bộ</span>
@@ -1204,11 +1199,10 @@ export default function SolarCalculator() {
                     label={`Pin lưu trữ (${selectedBattery.moduleKwh} kWh/module)`}
                     valueNode={
                       <span className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-1 font-mono font-medium">
-                        <input
-                          type="number"
+                        <NumInput
                           min={0}
                           value={batteryCountManual}
-                          onChange={(e) => setBatteryCountManual(Math.max(0, Number(e.target.value) || 0))}
+                          onChange={(v) => setBatteryCountManual(Math.max(0, v || 0))}
                           className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono"
                         />
                         <span>module</span>
@@ -1338,15 +1332,15 @@ export default function SolarCalculator() {
                     <td className="px-4 py-3 text-right font-mono">
                       {it.id === "shipping" ? (
                         <>
-                          <input type="number" min={0} value={shippingTrips} onChange={(e) => setShippingTrips(Number(e.target.value) || 0)} className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono" /> {it.unit}
+                          <NumInput min={0} value={shippingTrips} onChange={(v) => setShippingTrips(v || 0)} className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono" /> {it.unit}
                         </>
                       ) : it.id === "dc_cable" ? (
                         <>
-                          <input type="number" min={0} value={dcCableM} onChange={(e) => setDcCableM(Number(e.target.value) || 0)} className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono" /> {it.unit}
+                          <NumInput min={0} value={dcCableM} onChange={(v) => setDcCableM(v || 0)} className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono" /> {it.unit}
                         </>
                       ) : it.id === "ac_cable" ? (
                         <>
-                          <input type="number" min={0} value={acCableM} onChange={(e) => setAcCableM(Number(e.target.value) || 0)} className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono" /> {it.unit}
+                          <NumInput min={0} value={acCableM} onChange={(v) => setAcCableM(v || 0)} className="w-16 rounded-md border border-line px-1.5 py-1 text-right font-mono" /> {it.unit}
                         </>
                       ) : (
                         `${it.qty}${it.unit === "kWp" ? " kWp" : ""}`
@@ -1367,7 +1361,7 @@ export default function SolarCalculator() {
                 <tr className="bg-gold/[0.06]">
                   <td colSpan={3} className="px-4 py-3 text-right text-ink/70">Chiết khấu thương mại</td>
                   <td className="px-4 py-3 text-right">
-                    <input type="number" min={0} max={100} value={discountPercent} onChange={(e) => setDiscountPercent(Number(e.target.value) || 0)} className="w-16 rounded-md border border-line px-2.5 py-1.5 text-right font-mono" />%
+                    <NumInput min={0} max={100} value={discountPercent} onChange={(v) => setDiscountPercent(v || 0)} className="w-16 rounded-md border border-line px-2.5 py-1.5 text-right font-mono" />%
                   </td>
                   <td className="px-4 py-3 text-right font-mono">-{vnd(sub - totalPayment)}</td>
                   <td className="px-4 py-3"></td>
@@ -1400,18 +1394,19 @@ export default function SolarCalculator() {
 
           <div className="mt-4 rounded-2xl border border-line bg-white p-5">
             <div className="font-medium text-navy">Phương án vay &amp; hoàn vốn</div>
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <NumberField label="Tỉ lệ vay (%)" value={loanPercent} onChange={setLoanPercent} />
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <NumberField label="Tỉ lệ vay (%)" value={loanPercent} onChange={(v) => setLoanPercent(Math.min(100, v))} />
               <NumberField label="Lãi vay (%/năm)" value={interestRatePercent} onChange={setInterestRatePercent} />
+              <NumberField label="Thời hạn vay (năm)" value={loanTermYears} onChange={(v) => setLoanTermYears(Math.max(1, v))} />
               <div className="rounded-xl bg-surface p-3">
                 <div className="text-xs text-ink/50">Hoàn vốn (có vay)</div>
                 <div className="mt-1 font-mono text-lg font-semibold text-gold">{loan.paybackWithLoanYears === Infinity ? "—" : `${loan.paybackWithLoanYears} năm`}</div>
               </div>
             </div>
             <p className="mt-3 text-[13px] text-ink/55">
-              Vốn tự có {vnd(loan.ownCapitalVnd)} · Vay {vnd(loan.loanAmountVnd)} · Lãi năm 1 {vnd(loan.year1InterestVnd)} · Net năm 1 {vnd(loan.netYear1Vnd)}
+              Vốn tự có {vnd(loan.ownCapitalVnd)} · Vay {vnd(loan.loanAmountVnd)} · Trả nợ {vnd(loan.annualPaymentVnd)}/năm (gốc + lãi, {loan.termYears} năm) · Tổng lãi phải trả {vnd(loan.totalInterestVnd)} · Dòng tiền còn lại {vnd(loan.netYear1Vnd)}/năm
             </p>
-            <p className="mt-1.5 text-xs text-ink/40">Hoàn vốn = vốn tự có ÷ (tiết kiệm năm 1 − lãi vay năm 1). Ước tính đơn giản, chưa tính trả gốc dần theo lịch vay thực tế.</p>
+            <p className="mt-1.5 text-xs text-ink/40">Hoàn vốn (có vay) tính trên TỔNG đầu tư cộng lãi vay đã phát sinh: thời điểm tiết kiệm luỹ kế bù được (tổng đầu tư + lãi đã trả). Vay thêm thì lãi làm kéo dài thời gian hoàn vốn so với không vay. Tiết kiệm giữ nguyên mỗi năm, trả đều gốc + lãi theo kỳ hạn.</p>
           </div>
 
           <div className="mt-4 rounded-2xl border border-line bg-white">
@@ -1419,7 +1414,7 @@ export default function SolarCalculator() {
               <div className="font-medium text-navy">Khấu hao tài sản (đường thẳng)</div>
               <div className="flex items-center gap-2 text-xs text-ink/55">
                 <span>Số năm</span>
-                <input type="number" min={1} max={30} value={depreciationYears} onChange={(e) => setDepreciationYears(Number(e.target.value) || 1)} className="w-14 rounded-md border border-line px-2 py-1 text-right font-mono" />
+                <NumInput min={1} max={30} value={depreciationYears} onChange={(v) => setDepreciationYears(v || 1)} className="w-14 rounded-md border border-line px-2 py-1 text-right font-mono" />
               </div>
             </div>
             <div className="overflow-x-auto">
@@ -1478,7 +1473,7 @@ export default function SolarCalculator() {
               <div className="font-medium text-navy">Dự báo tiết kiệm</div>
               <div className="flex items-center gap-2 text-xs text-ink/55">
                 <span>Lạm phát</span>
-                <input type="number" min={0} max={30} value={inflationPercent} onChange={(e) => setInflationPercent(Number(e.target.value) || 0)} className="w-14 rounded-md border border-line px-2 py-1 text-right font-mono" />
+                <NumInput min={0} max={30} value={inflationPercent} onChange={(v) => setInflationPercent(v || 0)} className="w-14 rounded-md border border-line px-2 py-1 text-right font-mono" />
                 <span>%/năm</span>
               </div>
             </div>
@@ -1572,14 +1567,53 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
   );
 }
 
+/**
+ * Ô nhập số dùng chung. Giữ chuỗi người dùng đang gõ (draft) để xoá trống được và không bị dính số 0 đầu
+ * ("090", "015") như input type=number thường; chuẩn hoá lại khi rời ô.
+ */
+function NumInput({
+  value,
+  onChange,
+  className,
+  min,
+  max,
+  step,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  className?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <input
+      type="number"
+      inputMode="decimal"
+      min={min}
+      max={max}
+      step={step}
+      value={draft ?? String(value)}
+      onChange={(e) => {
+        const raw = e.target.value;
+        setDraft(raw.replace(/^(-?)0+(?=\d)/, "$1"));
+        const num = Number(raw);
+        onChange(raw === "" || Number.isNaN(num) ? 0 : num);
+      }}
+      onBlur={() => setDraft(null)}
+      className={className}
+    />
+  );
+}
+
 function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
     <div className="rounded-xl bg-surface p-3">
       <div className="text-xs text-ink/50">{label}</div>
-      <input
-        type="number"
+      <NumInput
         value={value}
-        onChange={(e) => onChange(Number(e.target.value) || 0)}
+        onChange={(v) => onChange(v || 0)}
         className="mt-1 w-full rounded-md border border-line bg-white px-2.5 py-1.5 font-mono focus:border-navy focus:outline-none"
       />
     </div>
