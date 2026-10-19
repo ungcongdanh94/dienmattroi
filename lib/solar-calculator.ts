@@ -9,6 +9,10 @@
 export const FIXED_PEAK_SUN_HOURS = 4;
 export const NIGHT_HOURS = 12;
 
+/** Tỉ lệ DC/AC tối đa: tổng công suất tấm pin (kWp) so với công suất AC của inverter (kW).
+ * Vượt tỉ lệ này inverter bị "cắt đỉnh" nên tấm pin thừa không phát thêm điện được. */
+export const MAX_DC_AC_RATIO = 1.5;
+
 export type SystemType = "on_grid" | "off_grid" | "hybrid";
 export type BatteryType = "lithium" | "acid";
 
@@ -228,6 +232,51 @@ export function calculateSolarSystem(input: SolarCalcInput): SolarCalcResult {
     notes,
     recommendation: getSystemRecommendation(dayUsagePercent, systemType),
     equipmentAdvisory: getEquipmentAdvisory(systemType, round2(inverterSizeKw), batteryCapacityKwh),
+  };
+}
+
+export interface ActualEnergyInput {
+  /** Công suất tấm pin THỰC LẮP (kWp) */
+  pvKwp: number;
+  /** Tổng công suất AC của inverter đã chọn (công suất × số bộ), kW */
+  inverterTotalKw: number;
+  /** Điện tiêu thụ của khách mỗi tháng (kWh) */
+  monthlyKwh: number;
+}
+
+export interface ActualEnergyResult {
+  /** Công suất tấm pin thực sự phát được sau khi bị giới hạn bởi inverter (kWp) */
+  usablePvKwp: number;
+  /** Inverter đã chọn có nhỏ hơn tấm pin (vượt tỉ lệ DC/AC tối đa) */
+  inverterLimited: boolean;
+  /** Công suất tấm pin tối đa mà inverter đã chọn nhận được (kWp) */
+  maxPvForInverterKwp: number;
+  /** Sản lượng PV ước tính mỗi tháng (kWh), đã tính giới hạn inverter */
+  productionKwhMonth: number;
+  /** Phần điện PV bù được cho nhu cầu của khách mỗi tháng (kWh) = min(sản lượng, tiêu thụ) */
+  coveredKwhMonth: number;
+  /** % nhu cầu điện được bù (tối đa 100) */
+  coveredPercent: number;
+  /** Điện phát ra vượt nhu cầu, không tính vào tiết kiệm (kWh/tháng) */
+  surplusKwhMonth: number;
+}
+
+/** Sản lượng & mức bù tính từ THIẾT BỊ ĐÃ CHỌN (tấm pin + inverter), khác với phần dự toán theo nhu cầu. */
+export function calculateActualEnergy({ pvKwp, inverterTotalKw, monthlyKwh }: ActualEnergyInput): ActualEnergyResult {
+  const maxPvForInverterKwp = inverterTotalKw * MAX_DC_AC_RATIO;
+  const inverterLimited = pvKwp > maxPvForInverterKwp + 1e-9;
+  const usablePvKwp = Math.max(0, Math.min(pvKwp, maxPvForInverterKwp));
+  const productionKwhMonth = usablePvKwp * FIXED_PEAK_SUN_HOURS * 30;
+  const coveredKwhMonth = Math.min(productionKwhMonth, Math.max(0, monthlyKwh));
+  const coveredPercent = monthlyKwh > 0 ? Math.min(100, (coveredKwhMonth / monthlyKwh) * 100) : 0;
+  return {
+    usablePvKwp: round2(usablePvKwp),
+    inverterLimited,
+    maxPvForInverterKwp: round2(maxPvForInverterKwp),
+    productionKwhMonth: Math.round(productionKwhMonth),
+    coveredKwhMonth: Math.round(coveredKwhMonth),
+    coveredPercent: Math.round(coveredPercent * 10) / 10,
+    surplusKwhMonth: Math.max(0, Math.round(productionKwhMonth - coveredKwhMonth)),
   };
 }
 
