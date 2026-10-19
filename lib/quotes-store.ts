@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import type { QuoteExportData } from "./quote-export";
 
 /** ⚠️ Cùng lưu ý như catalog-store.ts / projects-store.ts: cần Railway Volume
  * mount vào /app/data để lịch sử báo giá không bị mất khi deploy lại. */
@@ -18,7 +19,12 @@ export interface QuoteRecord {
   batteryBrand: string | null;
   totalPaymentVnd: number;
   exportKind: "png" | "pdf" | "xlsx";
+  /** Toàn bộ nội dung báo giá lúc xuất, để mở lại / xuất lại file sau này. Bản ghi cũ không có. */
+  snapshot?: QuoteExportData;
 }
+
+/** Dòng hiển thị trong lịch sử: bỏ snapshot (nặng) khỏi danh sách, chỉ báo có/không. */
+export type QuoteListItem = Omit<QuoteRecord, "snapshot"> & { hasSnapshot: boolean };
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const QUOTES_PATH = path.join(DATA_DIR, "quotes.json");
@@ -41,4 +47,8 @@ export function appendQuote(record: QuoteRecord): void {
   list.unshift(record); // mới nhất lên đầu
   const trimmed = list.slice(0, MAX_RECORDS);
   fs.writeFileSync(QUOTES_PATH, JSON.stringify(trimmed, null, 2), "utf-8");
+}
+
+export function getQuoteSnapshot(id: string): QuoteExportData | null {
+  return getQuotes().find((q) => q.id === id)?.snapshot ?? null;
 }

@@ -46,6 +46,24 @@ export interface QuoteFonts {
   bold: string;
 }
 
+/** Tải 3 file font từ /public/fonts (chỉ dùng ở trình duyệt) để nhúng vào PDF. */
+export async function loadQuoteFonts(base = "/fonts"): Promise<QuoteFonts> {
+  const load = async (name: string) => {
+    const res = await fetch(`${base}/${name}`);
+    if (!res.ok) throw new Error(`Không tải được font ${name}`);
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  };
+  const [regular, semibold, bold] = await Promise.all([
+    load("BeVietnamPro-Regular.ttf"),
+    load("BeVietnamPro-SemiBold.ttf"),
+    load("BeVietnamPro-Bold.ttf"),
+  ]);
+  return { regular, semibold, bold };
+}
+
 // ---------- định dạng số ----------
 
 function groupThousands(n: number): string {
