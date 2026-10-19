@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { PHASE_LABEL, type EquipmentCatalog, type PanelSpec, type InverterSpec, type BatterySpec } from "@/lib/catalog-types";
 import type { ProjectEntry } from "@/lib/projects-store";
-import type { QuoteRecord } from "@/lib/quotes-store";
+import type { QuoteListItem } from "@/lib/quotes-store";
+import type { QuoteExportData } from "@/lib/quote-export";
 import { readExcelRows, parsePanelRows, parseInverterRows, parseBatteryRows, downloadTemplate } from "@/lib/excel-import";
 
 type ImportKind = "panels" | "inverters" | "batteries";
@@ -17,12 +18,49 @@ export default function AdminPage() {
   const [projects, setProjects] = useState<ProjectEntry[] | null>(null);
   const [projectSaveStatus, setProjectSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [uploadingId, setUploadingId] = useState<string | null>(null);
-  const [quotes, setQuotes] = useState<QuoteRecord[] | null>(null);
+  const [quotes, setQuotes] = useState<QuoteListItem[] | null>(null);
+  const [reopening, setReopening] = useState<string | null>(null);
+  const [reopenWithPrices, setReopenWithPrices] = useState(true);
   const [importErrors, setImportErrors] = useState<Record<ImportKind, string[]>>({ panels: [], inverters: [], batteries: [] });
   const [importNotice, setImportNotice] = useState<Record<ImportKind, string>>({ panels: "", inverters: "", batteries: "" });
   const panelFileRef = useRef<HTMLInputElement>(null);
   const inverterFileRef = useRef<HTMLInputElement>(null);
   const batteryFileRef = useRef<HTMLInputElement>(null);
+
+  // Mở lại báo giá đã xuất: dựng lại PDF/Excel từ snapshot đã lưu lúc xuất
+  async function reopenQuote(q: QuoteListItem, kind: "pdf" | "xlsx") {
+    const key = `${q.id}:${kind}`;
+    setReopening(key);
+    // mở tab trống ngay trong thao tác bấm để trình duyệt không chặn popup
+    const tab = kind === "pdf" ? window.open("", "_blank") : null;
+    try {
+      const res = await fetch(`/api/quotes?id=${encodeURIComponent(q.id)}`);
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Không tải được dữ liệu báo giá");
+      const data: QuoteExportData = { ...(await res.json()), showPrices: reopenWithPrices };
+      const { buildQuotePdf, buildQuoteXlsx, loadQuoteFonts } = await import("@/lib/quote-export");
+      let blob: Blob;
+      if (kind === "pdf") {
+        blob = (await buildQuotePdf(data, await loadQuoteFonts())).output("blob");
+      } else {
+        blob = new Blob([await buildQuoteXlsx(data)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      }
+      const url = URL.createObjectURL(blob);
+      if (kind === "pdf" && tab) {
+        tab.location.href = url;
+      } else {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `bao-gia-${q.quoteCode}.${kind}`;
+        a.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      tab?.close();
+      alert(err instanceof Error ? err.message : "Không mở lại được báo giá");
+    } finally {
+      setReopening(null);
+    }
+  }
 
   useEffect(() => {
     fetch("/api/admin/session")
@@ -611,7 +649,11 @@ export default function AdminPage() {
         <div className="mt-10 rounded-2xl border border-line bg-white">
           <div className="border-b border-line px-5 py-3">
             <h2 className="font-display text-lg font-semibold text-navy">Lịch sử báo giá đã xuất</h2>
-            <p className="mt-1 text-xs text-ink/50">Tự động lưu mỗi khi khách/sale bấm Xuất PNG hoặc PDF ở trang tính toán.</p>
+            <p className="mt-1 text-xs text-ink/50">Tự động lưu mỗi khi khách/sale bấm xuất file ở trang tính toán. Bấm PDF / Excel ở cột "Xem lại" để mở lại đúng nội dung báo giá lúc xuất.</p>
+            <label className="mt-2 flex items-center gap-2 text-xs text-ink/60">
+              <input type="checkbox" checked={reopenWithPrices} onChange={(e) => setReopenWithPrices(e.target.checked)} />
+              Kèm đơn giá chi tiết từng hạng mục khi xem lại
+            </label>
           </div>
           {!quotes ? (
             <div className="p-5 text-sm text-ink/50">Đang tải…</div>
@@ -630,6 +672,7 @@ export default function AdminPage() {
                     <th className="px-5 py-2.5 text-right font-medium">Công suất</th>
                     <th className="px-5 py-2.5 text-right font-medium">Tổng tiền</th>
                     <th className="px-5 py-2.5 font-medium">Xuất</th>
+                    <th className="px-5 py-2.5 font-medium">Xem lại</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -643,6 +686,25 @@ export default function AdminPage() {
                       <td className="px-5 py-2.5 text-right font-mono">{q.pvSizeKwp} kWp</td>
                       <td className="px-5 py-2.5 text-right font-mono">{q.totalPaymentVnd.toLocaleString("vi-VN")} đ</td>
                       <td className="px-5 py-2.5 uppercase text-ink/50">{q.exportKind}</td>
+                      <td className="px-5 py-2.5">
+                        {q.hasSnapshot ? (
+                          <div className="flex gap-1.5">
+                            {(["pdf", "xlsx"] as const).map((k) => (
+                              <button
+                                key={k}
+                                type="button"
+                                onClick={() => reopenQuote(q, k)}
+                                disabled={reopening !== null}
+                                className="rounded-md border border-line px-2.5 py-1 text-xs font-medium text-navy hover:bg-surface disabled:opacity-50"
+                              >
+                                {reopening === `${q.id}:${k}` ? "…" : k === "pdf" ? "PDF" : "Excel"}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-ink/35" title="Báo giá xuất trước khi có tính năng lưu chi tiết">Không có dữ liệu</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
