@@ -597,7 +597,7 @@ export default function SolarCalculator() {
       link.href = canvas.toDataURL("image/png");
       link.click();
 
-      saveQuoteRecord(kind);
+      saveQuoteRecord(kind, buildExportData());
     } finally {
       if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
       setExporting(null);
@@ -605,7 +605,7 @@ export default function SolarCalculator() {
   }
 
   // Lưu lại báo giá này vào hệ thống (xem được trong /admin)
-  function saveQuoteRecord(kind: "png" | "pdf" | "xlsx") {
+  function saveQuoteRecord(kind: "png" | "pdf" | "xlsx", snapshot?: QuoteExportData | null) {
     fetch("/api/quotes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -615,73 +615,69 @@ export default function SolarCalculator() {
         customerPhone,
         siteAddress,
         systemType,
-        pvSizeKwp: result.pvSizeKwp,
+        pvSizeKwp: round1(actualCapacityKwp) || result.pvSizeKwp,
         panelBrand: selectedPanel?.brand ?? "",
         inverterBrand: selectedInverter?.brand ?? "",
         batteryBrand: selectedBattery?.brand ?? null,
         totalPaymentVnd: totalPayment,
         exportKind: kind,
+        snapshot: snapshot ?? undefined,
       }),
     }).catch(() => {});
   }
 
+  // Dựng toàn bộ nội dung báo giá hiện tại (dùng để xuất file và lưu snapshot vào lịch sử)
+  function buildExportData(): QuoteExportData | null {
+    if (!selectedPanel || !selectedInverter || !equipment) return null;
+    const today = new Date();
+    const dateStr = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}/${today.getFullYear()}`;
+    const hasBattery = equipment.batteryModuleCount !== null && !!selectedBattery;
+    const data: QuoteExportData = {
+      quoteCode,
+      dateStr,
+      customerName,
+      customerPhone,
+      siteAddress,
+      systemLabel: SYSTEM_LABEL[systemType].title,
+      panel: { brand: selectedPanel.brand, wattage: selectedPanel.wattage, qty: equipment.panelCount, warranty: selectedPanel.warranty },
+      inverter: {
+        brand: selectedInverter.brand,
+        kindLabel: KIND_LABEL[selectedInverter.kind],
+        phaseLabel: PHASE_LABEL[selectedInverter.phase],
+        capacityKw: selectedInverter.capacityKw,
+        qty: Math.max(0, inverterCountManual),
+        warranty: selectedInverter.warranty,
+      },
+      battery: hasBattery
+        ? { brand: selectedBattery!.brand, moduleKwh: selectedBattery!.moduleKwh, qty: equipment.batteryModuleCount ?? 0, warranty: selectedBattery!.warranty }
+        : null,
+      totalKwp: round1(actualCapacityKwp),
+      savingsPerMonthVnd: savingsPerMonth,
+      savingsPerYearVnd: savingsPerYear,
+      paybackYears: paybackYears === Infinity || paybackYears <= 0 ? null : paybackYears,
+      offsetPercent: systemType === "off_grid" ? null : effectiveOffsetPercent,
+      items,
+      subtotalVnd: sub,
+      discountPercent,
+      totalPaymentVnd: totalPayment,
+      showPrices: !effectiveCustomerView,
+      company: COMPANY,
+    };
+    return data;
+  }
+
   // Xuất file báo giá chuyên nghiệp (PDF vector / Excel). Khách xem thì ẩn đơn giá từng hạng mục.
   async function handleQuoteExport(kind: "pdf" | "xlsx") {
-    if (!selectedPanel || !selectedInverter || !equipment) return;
+    const data = buildExportData();
+    if (!data) return;
     setExporting(kind);
     try {
-      const today = new Date();
-      const dateStr = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}/${today.getFullYear()}`;
-      const hasBattery = equipment.batteryModuleCount !== null && !!selectedBattery;
-      const data: QuoteExportData = {
-        quoteCode,
-        dateStr,
-        customerName,
-        customerPhone,
-        siteAddress,
-        systemLabel: SYSTEM_LABEL[systemType].title,
-        panel: { brand: selectedPanel.brand, wattage: selectedPanel.wattage, qty: equipment.panelCount, warranty: selectedPanel.warranty },
-        inverter: {
-          brand: selectedInverter.brand,
-          kindLabel: KIND_LABEL[selectedInverter.kind],
-          phaseLabel: PHASE_LABEL[selectedInverter.phase],
-          capacityKw: selectedInverter.capacityKw,
-          qty: Math.max(0, inverterCountManual),
-          warranty: selectedInverter.warranty,
-        },
-        battery: hasBattery
-          ? { brand: selectedBattery!.brand, moduleKwh: selectedBattery!.moduleKwh, qty: equipment.batteryModuleCount ?? 0, warranty: selectedBattery!.warranty }
-          : null,
-        totalKwp: round1(actualCapacityKwp),
-        savingsPerMonthVnd: savingsPerMonth,
-        savingsPerYearVnd: savingsPerYear,
-        paybackYears: paybackYears === Infinity || paybackYears <= 0 ? null : paybackYears,
-        offsetPercent: systemType === "off_grid" ? null : effectiveOffsetPercent,
-        items,
-        subtotalVnd: sub,
-        discountPercent,
-        totalPaymentVnd: totalPayment,
-        showPrices: !effectiveCustomerView,
-        company: COMPANY,
-      };
-
-      const { buildQuotePdf, buildQuoteXlsx } = await import("@/lib/quote-export");
+      const { buildQuotePdf, buildQuoteXlsx, loadQuoteFonts } = await import("@/lib/quote-export");
       let blob: Blob;
       let filename: string;
       if (kind === "pdf") {
-        const loadFont = async (name: string) => {
-          const buf = await (await fetch(`/fonts/${name}`)).arrayBuffer();
-          let bin = "";
-          const bytes = new Uint8Array(buf);
-          for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-          return btoa(bin);
-        };
-        const [regular, semibold, bold] = await Promise.all([
-          loadFont("BeVietnamPro-Regular.ttf"),
-          loadFont("BeVietnamPro-SemiBold.ttf"),
-          loadFont("BeVietnamPro-Bold.ttf"),
-        ]);
-        const doc = await buildQuotePdf(data, { regular, semibold, bold });
+        const fonts = await loadQuoteFonts();
+        const doc = await buildQuotePdf(data, fonts);
         blob = doc.output("blob");
         filename = `bao-gia-${quoteCode}.pdf`;
       } else {
@@ -696,7 +692,7 @@ export default function SolarCalculator() {
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
 
-      saveQuoteRecord(kind);
+      saveQuoteRecord(kind, data);
     } catch (err) {
       console.error(err);
       alert("Không xuất được file báo giá, vui lòng thử lại.");
