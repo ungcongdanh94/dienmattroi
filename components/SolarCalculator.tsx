@@ -45,6 +45,8 @@ import {
   generateQuoteCode,
   type QuoteItem,
 } from "@/lib/quote-financials";
+import { COMPANY } from "@/lib/site-data";
+import type { QuoteExportData } from "@/lib/quote-export";
 
 const SYSTEM_LABEL: Record<SystemType, { title: string; desc: string }> = {
   on_grid: { title: "On-grid", desc: "Hoà lưới, không pin — bù hoá đơn tiền điện" },
@@ -158,7 +160,7 @@ export default function SolarCalculator() {
   const [usdVndRate, setUsdVndRate] = useState<number>(25500);
 
   const reportRef = useRef<HTMLDivElement>(null);
-  const [exporting, setExporting] = useState<"png" | "pdf" | null>(null);
+  const [exporting, setExporting] = useState<"png" | "pdf" | "xlsx" | null>(null);
   const [customerView, setCustomerView] = useState<boolean>(true);
   const [staffAuthenticated, setStaffAuthenticated] = useState<boolean | null>(null);
   const [showStaffLogin, setShowStaffLogin] = useState(false);
@@ -539,7 +541,7 @@ export default function SolarCalculator() {
   const annualProductionKwh = systemType === "off_grid" ? monthlyKwh * 12 : monthlyKwh * 12 * (effectiveOffsetPercent / 100);
   const carbon = calculateCarbon(annualProductionKwh, carbonPriceUsd, usdVndRate);
 
-  async function handleExport(kind: "png" | "pdf") {
+  async function handleExport(kind: "png") {
     if (!reportRef.current) return;
     setExporting(kind);
     let clone: HTMLElement | null = null;
@@ -589,39 +591,115 @@ export default function SolarCalculator() {
 
       const canvas = await html2canvas(clone, { backgroundColor: "#F7F8FA", scale: 2 });
 
-      if (kind === "png") {
-        const link = document.createElement("a");
-        link.download = `bao-gia-${quoteCode}.png`;
-        link.href = canvas.toDataURL("image/png");
-        link.click();
-      } else {
-        const { jsPDF } = await import("jspdf");
-        const imgData = canvas.toDataURL("image/png");
-        const pdf = new jsPDF({ orientation: "p", unit: "px", format: [canvas.width, canvas.height] });
-        pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
-        pdf.save(`bao-gia-${quoteCode}.pdf`);
-      }
+      const link = document.createElement("a");
+      link.download = `bao-gia-${quoteCode}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
 
-      // Lưu lại báo giá này vào hệ thống (xem được trong /admin)
-      fetch("/api/quotes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          quoteCode,
-          customerName,
-          customerPhone,
-          siteAddress,
-          systemType,
-          pvSizeKwp: result.pvSizeKwp,
-          panelBrand: selectedPanel?.brand ?? "",
-          inverterBrand: selectedInverter?.brand ?? "",
-          batteryBrand: selectedBattery?.brand ?? null,
-          totalPaymentVnd: totalPayment,
-          exportKind: kind,
-        }),
-      }).catch(() => {});
+      saveQuoteRecord(kind);
     } finally {
       if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
+      setExporting(null);
+    }
+  }
+
+  // Lưu lại báo giá này vào hệ thống (xem được trong /admin)
+  function saveQuoteRecord(kind: "png" | "pdf" | "xlsx") {
+    fetch("/api/quotes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        quoteCode,
+        customerName,
+        customerPhone,
+        siteAddress,
+        systemType,
+        pvSizeKwp: result.pvSizeKwp,
+        panelBrand: selectedPanel?.brand ?? "",
+        inverterBrand: selectedInverter?.brand ?? "",
+        batteryBrand: selectedBattery?.brand ?? null,
+        totalPaymentVnd: totalPayment,
+        exportKind: kind,
+      }),
+    }).catch(() => {});
+  }
+
+  // Xuất file báo giá chuyên nghiệp (PDF vector / Excel). Khách xem thì ẩn đơn giá từng hạng mục.
+  async function handleQuoteExport(kind: "pdf" | "xlsx") {
+    if (!selectedPanel || !selectedInverter || !equipment) return;
+    setExporting(kind);
+    try {
+      const today = new Date();
+      const dateStr = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}/${today.getFullYear()}`;
+      const hasBattery = equipment.batteryModuleCount !== null && !!selectedBattery;
+      const data: QuoteExportData = {
+        quoteCode,
+        dateStr,
+        customerName,
+        customerPhone,
+        siteAddress,
+        systemLabel: SYSTEM_LABEL[systemType].title,
+        panel: { brand: selectedPanel.brand, wattage: selectedPanel.wattage, qty: equipment.panelCount, warranty: selectedPanel.warranty },
+        inverter: {
+          brand: selectedInverter.brand,
+          kindLabel: KIND_LABEL[selectedInverter.kind],
+          phaseLabel: PHASE_LABEL[selectedInverter.phase],
+          capacityKw: selectedInverter.capacityKw,
+          qty: Math.max(0, inverterCountManual),
+          warranty: selectedInverter.warranty,
+        },
+        battery: hasBattery
+          ? { brand: selectedBattery!.brand, moduleKwh: selectedBattery!.moduleKwh, qty: equipment.batteryModuleCount ?? 0, warranty: selectedBattery!.warranty }
+          : null,
+        totalKwp: round1(actualCapacityKwp),
+        savingsPerMonthVnd: savingsPerMonth,
+        savingsPerYearVnd: savingsPerYear,
+        paybackYears: paybackYears === Infinity || paybackYears <= 0 ? null : paybackYears,
+        offsetPercent: systemType === "off_grid" ? null : effectiveOffsetPercent,
+        items,
+        subtotalVnd: sub,
+        discountPercent,
+        totalPaymentVnd: totalPayment,
+        showPrices: !effectiveCustomerView,
+        company: COMPANY,
+      };
+
+      const { buildQuotePdf, buildQuoteXlsx } = await import("@/lib/quote-export");
+      let blob: Blob;
+      let filename: string;
+      if (kind === "pdf") {
+        const loadFont = async (name: string) => {
+          const buf = await (await fetch(`/fonts/${name}`)).arrayBuffer();
+          let bin = "";
+          const bytes = new Uint8Array(buf);
+          for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+          return btoa(bin);
+        };
+        const [regular, semibold, bold] = await Promise.all([
+          loadFont("BeVietnamPro-Regular.ttf"),
+          loadFont("BeVietnamPro-SemiBold.ttf"),
+          loadFont("BeVietnamPro-Bold.ttf"),
+        ]);
+        const doc = await buildQuotePdf(data, { regular, semibold, bold });
+        blob = doc.output("blob");
+        filename = `bao-gia-${quoteCode}.pdf`;
+      } else {
+        const buf = await buildQuoteXlsx(data);
+        blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        filename = `bao-gia-${quoteCode}.xlsx`;
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+      saveQuoteRecord(kind);
+    } catch (err) {
+      console.error(err);
+      alert("Không xuất được file báo giá, vui lòng thử lại.");
+    } finally {
       setExporting(null);
     }
   }
@@ -1442,22 +1520,30 @@ export default function SolarCalculator() {
         </section>
 
         {/* Export */}
-        <div className="mt-8 flex gap-3">
+        <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <button
+            type="button"
+            onClick={() => handleQuoteExport("pdf")}
+            disabled={exporting !== null}
+            className="rounded-xl bg-navy px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {exporting === "pdf" ? "Đang xuất…" : "Xuất báo giá PDF"}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuoteExport("xlsx")}
+            disabled={exporting !== null}
+            className="rounded-xl bg-energy px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {exporting === "xlsx" ? "Đang xuất…" : "Xuất báo giá Excel"}
+          </button>
           <button
             type="button"
             onClick={() => handleExport("png")}
             disabled={exporting !== null}
-            className="flex-1 rounded-xl bg-energy px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="rounded-xl border border-line bg-white px-4 py-3 text-sm font-semibold text-navy transition-colors hover:bg-surface disabled:opacity-50"
           >
-            {exporting === "png" ? "Đang xuất…" : "Xuất PNG"}
-          </button>
-          <button
-            type="button"
-            onClick={() => handleExport("pdf")}
-            disabled={exporting !== null}
-            className="flex-1 rounded-xl bg-navy px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
-            {exporting === "pdf" ? "Đang xuất…" : "Xuất PDF"}
+            {exporting === "png" ? "Đang xuất…" : "Xuất ảnh PNG (toàn trang)"}
           </button>
         </div>
       </div>
