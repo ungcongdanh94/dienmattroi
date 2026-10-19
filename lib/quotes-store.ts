@@ -17,7 +17,7 @@ export interface QuoteRecord {
   inverterBrand: string;
   batteryBrand: string | null;
   totalPaymentVnd: number;
-  exportKind: "png" | "pdf";
+  exportKind: "png" | "pdf" | "xlsx";
 }
 
 const DATA_DIR = path.join(process.cwd(), "data");
