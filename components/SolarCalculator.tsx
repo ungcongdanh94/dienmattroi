@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   calculateSolarSystem,
-  calculateActualEnergy,
-  MAX_DC_AC_RATIO,
+  FIXED_PEAK_SUN_HOURS,
   type BatteryType,
   type SystemType,
 } from "@/lib/solar-calculator";
@@ -419,20 +418,15 @@ export default function SolarCalculator() {
   // vì thường lớn hơn công suất yêu cầu (result.pvSizeKwp) do làm tròn số tấm lên.
   const actualCapacityKwp = selectedPanel && equipment ? (equipment.panelCount * selectedPanel.wattage) / 1000 : 0;
 
-  // Sản lượng điện THỰC TẾ tính từ THIẾT BỊ ĐÃ CHỌN (số tấm pin × công suất, giới hạn bởi inverter đã chọn).
-  // Phần phía trên "Chọn combo thiết bị" chỉ là dự toán/tham khảo; mọi số liệu từ đây trở xuống
-  // (tiết kiệm, hoàn vốn, khấu hao, IRR, carbon, file báo giá) dùng kết quả này.
-  const energy = useMemo(
-    () =>
-      calculateActualEnergy({
-        pvKwp: actualCapacityKwp,
-        inverterTotalKw: (selectedInverter?.capacityKw ?? 0) * Math.max(0, inverterCountManual),
-        monthlyKwh,
-      }),
-    [actualCapacityKwp, selectedInverter, inverterCountManual, monthlyKwh],
-  );
-  // Mức bù hoá đơn THỰC TẾ (tối đa 100%) theo sản lượng thực tế so với nhu cầu điện.
-  const effectiveOffsetPercent = energy.coveredPercent;
+  // Sản lượng điện THỰC TẾ theo công suất tấm pin đã chọn (số tấm có thể đã sửa tay) —
+  // dùng để tính lại toàn bộ phân tích tài chính (tiết kiệm/hoàn vốn/khấu hao/IRR) thay vì
+  // chỉ dựa theo % bù hoá đơn lý thuyết lúc đầu, vì số tấm thực tế có thể khác công suất đề xuất.
+  const actualMonthlyProductionKwh = actualCapacityKwp * FIXED_PEAK_SUN_HOURS * 30;
+  // Mức bù hoá đơn THỰC TẾ (giới hạn tối đa 100%) suy ra từ sản lượng thực tế so với tiêu thụ.
+  const effectiveOffsetPercent =
+    systemType !== "off_grid" && monthlyKwh > 0
+      ? Math.min(100, round1((actualMonthlyProductionKwh / monthlyKwh) * 100))
+      : offsetPercent;
 
   useEffect(() => {
     if (!actualCapacityKwp) return;
@@ -545,7 +539,7 @@ export default function SolarCalculator() {
   const priceVndPerKwh = monthlyKwh > 0 ? Math.round(estimatedBillVnd / monthlyKwh) : 0;
   const projection10Y = project10YearSavings(priceVndPerKwh, savingsPerYear, inflationPercent);
 
-  const annualProductionKwh = energy.coveredKwhMonth * 12;
+  const annualProductionKwh = systemType === "off_grid" ? monthlyKwh * 12 : monthlyKwh * 12 * (effectiveOffsetPercent / 100);
   const carbon = calculateCarbon(annualProductionKwh, carbonPriceUsd, usdVndRate);
 
   async function handleExport(kind: "png") {
@@ -1384,27 +1378,11 @@ export default function SolarCalculator() {
         <section className="mt-8">
           <h2 className="font-display text-lg font-semibold text-navy">Phân tích tài chính</h2>
           <p className="mt-1 text-xs text-ink/45">
-            Tính theo THIẾT BỊ ĐÃ CHỌN ({round1(actualCapacityKwp)} kWp tấm pin
-            {selectedInverter ? ` · inverter ${selectedInverter.capacityKw} kW × ${inverterCountManual}` : ""}) — khác phần dự toán theo nhu cầu ở trên. Sửa số lượng thiết bị thì các số liệu bên dưới tự cập nhật.
+            Tính theo công suất tấm pin THỰC TẾ đã chọn ({round1(actualCapacityKwp)} kWp
+            {systemType !== "off_grid" ? ` · mức bù hoá đơn thực tế ≈ ${effectiveOffsetPercent}%` : ""}) — sửa số lượng tấm pin/inverter/pin lưu trữ ở trên sẽ tự cập nhật lại các số liệu bên dưới.
           </p>
-          {energy.inverterLimited && (
-            <p className="mt-2 rounded-lg bg-gold/10 px-3 py-2 text-xs text-ink/70">
-              Inverter đã chọn chỉ nhận tối đa khoảng {energy.maxPvForInverterKwp} kWp tấm pin (tỉ lệ DC/AC {MAX_DC_AC_RATIO}) — phần tấm pin vượt quá không phát thêm điện. Tăng công suất/số lượng inverter hoặc giảm số tấm pin.
-            </p>
-          )}
-          {energy.surplusKwhMonth > 0 && (
-            <p className="mt-2 rounded-lg bg-surface px-3 py-2 text-xs text-ink/60">
-              Hệ thống phát nhiều hơn nhu cầu điện khoảng {energy.surplusKwhMonth} kWh/tháng — phần dư không tính vào tiết kiệm, nên tiết kiệm tối đa bằng hoá đơn hiện tại.
-            </p>
-          )}
-          {energy.coveredPercent < 100 && (
-            <p className="mt-2 rounded-lg bg-surface px-3 py-2 text-xs text-ink/60">
-              Với thiết bị đã chọn, hệ thống mới bù được khoảng {energy.coveredPercent}% nhu cầu điện hiện tại.
-            </p>
-          )}
-          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <MetricCard label="Sản lượng PV/tháng" value={`${energy.productionKwhMonth} kWh`} />
-            <MetricCard label="Điện bù được/tháng" value={`${energy.coveredKwhMonth} kWh`} />
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <MetricCard label="Sản lượng bù/tháng" value={`${Math.round(monthlyKwh * (systemType === "off_grid" ? 1 : effectiveOffsetPercent / 100))} kWh`} />
             <MetricCard label="Tiết kiệm/tháng" value={vnd(savingsPerMonth)} accent="#2F8F5B" />
             <MetricCard label="Tổng đầu tư" value={vnd(totalPayment)} />
             <MetricCard label="Hoàn vốn" value={paybackYears === Infinity ? "—" : `${paybackYears} năm`} accent="#E8A33D" />
@@ -1436,9 +1414,17 @@ export default function SolarCalculator() {
                 </div>
               ))}
             </dl>
-            <p className="mt-2.5 text-xs text-ink/45">
-              Hoàn vốn (có vay) = thời gian để tiền tiết kiệm điện cộng dồn đủ bù cả tiền đầu tư lẫn lãi vay đã trả. Vay càng nhiều, lãi càng lớn nên hoàn vốn càng lâu. Tính theo tiết kiệm không đổi mỗi năm và trả đều gốc + lãi.
-            </p>
+            <div className="mt-3 rounded-xl bg-surface p-3.5 text-xs leading-relaxed text-ink/60">
+              <div className="mb-1 font-medium text-ink/75">Ghi chú cách tính</div>
+              <ul className="list-disc space-y-1 pl-4">
+                <li>Số tiền vay = Tổng đầu tư × Tỉ lệ vay. Vốn tự bỏ ra = phần còn lại.</li>
+                <li>Mỗi năm trả ngân hàng = Số tiền vay ÷ Số năm + Lãi suất × Số tiền vay (trả đều như nhau mỗi năm, lãi tính trên số tiền vay ban đầu).</li>
+                <li>Tổng lãi = Lãi suất × Số tiền vay × Số năm vay.</li>
+                <li>Còn dư mỗi năm = Tiết kiệm tiền điện mỗi năm − Số tiền trả ngân hàng mỗi năm.</li>
+                <li>Hoàn vốn (có vay) = (Tổng đầu tư + Tổng lãi) ÷ Tiết kiệm tiền điện mỗi năm. Vay càng nhiều, lãi càng lớn nên hoàn vốn càng lâu.</li>
+                <li>Tiết kiệm tiền điện giữ nguyên mỗi năm; số liệu là ước tính tham khảo, thực tế phụ thuộc điều kiện ngân hàng và mức sử dụng điện.</li>
+              </ul>
+            </div>
           </div>
 
           <div className="mt-4 rounded-2xl border border-line bg-white">
