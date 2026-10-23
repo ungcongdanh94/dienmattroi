@@ -1479,7 +1479,16 @@ export default function SolarCalculator() {
                 <div className="mt-1 text-sm font-semibold text-energy">{irrConclusion}</div>
               </div>
             </div>
-            <p className="mt-2 text-xs text-ink/40">Ước tính dựa trên dòng tiền tiết kiệm điện 25 năm, có tính lạm phát giá điện và suy hao tấm pin ~0,5%/năm.</p>
+            <div className="mt-3 rounded-xl bg-surface p-3.5 text-xs leading-relaxed text-ink/60">
+              <div className="mb-1 font-medium text-ink/75">Ghi chú cách đọc</div>
+              <ul className="list-disc space-y-1 pl-4">
+                <li>IRR là mức sinh lời mỗi năm của số tiền bỏ vào hệ thống, tính từ tiền đầu tư ban đầu và tiền điện tiết kiệm được trong 25 năm (có tính lạm phát giá điện và suy hao tấm pin ~0,5%/năm).</li>
+                <li>Lãi vay NH là chi phí đi vay; lãi gửi tiết kiệm là mức sinh lời nếu để tiền trong ngân hàng.</li>
+                <li>IRR cao hơn lãi vay → &quot;Tốt hơn vay NH&quot;: vay tiền để lắp hệ thống vẫn có lời, vì tiền điện tiết kiệm được lớn hơn tiền lãi phải trả.</li>
+                <li>IRR thấp hơn lãi vay nhưng cao hơn lãi gửi → &quot;Tốt hơn gửi tiết kiệm&quot;. IRR thấp hơn cả hai → &quot;Cân nhắc lại&quot;.</li>
+                <li>Lãi vay ở đây là lãi suất danh nghĩa; nếu ngân hàng tính lãi trên gốc ban đầu thì chi phí thực tế cao hơn con số này. Kết quả chỉ là ước tính tham khảo, phụ thuộc vào giả định lạm phát điện và tiền điện tiết kiệm không đổi.</li>
+              </ul>
+            </div>
           </div>
         </section>
 
