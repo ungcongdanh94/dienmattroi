@@ -1,7 +1,9 @@
 /**
  * BẢNG GIÁ ĐIỆN EVN — Sinh hoạt / Sản xuất / Kinh doanh
- * Theo Quyết định 14/2025/QĐ-TTg (cơ cấu %), Quyết định 1279/QĐ-BCT (đơn giá đồng/kWh)
- * và Quyết định 963/QĐ-BCT (khung giờ cao điểm/thấp điểm), Bộ Công Thương.
+ * Sinh hoạt (5 bậc) và Sản xuất: Quyết định 2892/QĐ-BCT ngày 31/10/2026, hiệu lực từ 01/11/2026
+ * (EVN giảm 2% giá bán lẻ bình quân còn 2.159,9037 đ/kWh — QĐ 1305/QĐ-EVN).
+ * Kinh doanh: GIỮ NGUYÊN số cũ (QĐ 1279/QĐ-BCT) — chưa có bảng giá mới, cần cập nhật khi có.
+ * Khung giờ cao điểm/thấp điểm: Quyết định 963/QĐ-BCT, Bộ Công Thương.
  *
  * ⚠️ QUAN TRỌNG: Giá điện SINH HOẠT áp dụng chung cho cả 1 pha và 3 pha — không có
  * bảng giá riêng theo số pha. Yếu tố thực sự tạo ra sự khác biệt về giá là MỤC ĐÍCH
@@ -43,29 +45,26 @@ export interface EvnTariff {
 const UNBOUNDED_KWH = 1_000_000;
 
 export const EVN_TARIFF_2026: EvnTariff = {
-  effectiveFrom: "2025-05-29",
+  effectiveFrom: "2026-11-01",
   source:
-    "QĐ 14/2025/QĐ-TTg, QĐ 1279/QĐ-BCT (giá bình quân 2.204,06 đ/kWh), QĐ 963/QĐ-BCT (khung giờ)",
+    "QĐ 2892/QĐ-BCT ngày 31/10/2026 (sinh hoạt 5 bậc, sản xuất); kinh doanh: QĐ 1279/QĐ-BCT (chưa cập nhật)",
   vatRate: 0.08,
 
-  // Sinh hoạt: 6 bậc lũy tiến — áp dụng chung cho 1 pha và 3 pha
-  // Đã đối chiếu khớp 100% với hóa đơn điện tử thực tế (kỳ 7/2026, An Giang):
-  // 1.285.560đ chưa thuế + 8% VAT = 1.388.405đ tổng thanh toán ✓
+  // Sinh hoạt: 5 bậc lũy tiến (từ 01/11/2026) — áp dụng chung cho 1 pha và 3 pha, giá chưa VAT
   sinhHoatTiers: [
-    { maxKwh: 50, pricePerKwh: 1984, label: "Bậc 1: 0 - 50 kWh" },
-    { maxKwh: 100, pricePerKwh: 2050, label: "Bậc 2: 51 - 100 kWh" },
-    { maxKwh: 200, pricePerKwh: 2380, label: "Bậc 3: 101 - 200 kWh" },
-    { maxKwh: 300, pricePerKwh: 2998, label: "Bậc 4: 201 - 300 kWh" },
-    { maxKwh: 400, pricePerKwh: 3350, label: "Bậc 5: 301 - 400 kWh" },
-    { maxKwh: UNBOUNDED_KWH, pricePerKwh: 3460, label: "Bậc 6: Từ 401 kWh" },
+    { maxKwh: 100, pricePerKwh: 1901, label: "Bậc 1: 0 - 100 kWh" },
+    { maxKwh: 200, pricePerKwh: 2289, label: "Bậc 2: 101 - 200 kWh" },
+    { maxKwh: 400, pricePerKwh: 2894, label: "Bậc 3: 201 - 400 kWh" },
+    { maxKwh: 700, pricePerKwh: 3456, label: "Bậc 4: 401 - 700 kWh" },
+    { maxKwh: UNBOUNDED_KWH, pricePerKwh: 3844, label: "Bậc 5: Trên 700 kWh" },
   ],
 
-  // Sản xuất: 4 cấp điện áp × 3 khung giờ, giá cố định (không lũy tiến)
+  // Sản xuất: 4 cấp điện áp × 3 khung giờ (từ 01/11/2026), giá cố định, chưa VAT
   sanXuatByVoltage: [
-    { voltageLabel: "Dưới 6 kV", offPeak: 1300, normal: 1987, peak: 3640 },
-    { voltageLabel: "6 kV - dưới 22 kV", offPeak: 1234, normal: 1899, peak: 3508 },
-    { voltageLabel: "22 kV - dưới 110 kV", offPeak: 1190, normal: 1833, peak: 3398 },
-    { voltageLabel: "Từ 110 kV trở lên", offPeak: 1146, normal: 1811, peak: 3266 },
+    { voltageLabel: "Hạ áp (đến 1 kV)", offPeak: 1274, normal: 1966, peak: 3586 },
+    { voltageLabel: "Trung áp (trên 1 kV đến 35 kV)", offPeak: 1166, normal: 1814, peak: 3348 },
+    { voltageLabel: "Trên 35 kV đến dưới 220 kV", offPeak: 1123, normal: 1792, peak: 3218 },
+    { voltageLabel: "Từ 220 kV trở lên", offPeak: 1101, normal: 1771, peak: 3110 },
   ],
 
   // Kinh doanh: 3 cấp điện áp × 3 khung giờ, giá cố định (không lũy tiến)
