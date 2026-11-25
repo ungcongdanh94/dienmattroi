@@ -210,6 +210,8 @@ export interface StorageSuggestionInput {
   /** null = tự động theo 0,5C của cụm pin gợi ý */
   maxChargeDcKw: number | null;
   maxDischargeDcKw: number | null;
+  /** Tải đỉnh giờ cao điểm của khách (kW, AC) — 0 = chưa nhập */
+  peakLoadKw?: number;
 }
 
 export interface StorageSuggestion {
@@ -223,6 +225,8 @@ export interface StorageSuggestion {
   requiredChargeAcKw: number;
   requiredDischargeAcKw: number;
   requiredInverterKw: number;
+  /** Công suất inverter cần để cấp đủ tải đỉnh (0 nếu chưa nhập tải đỉnh) */
+  requiredByPeakLoadKw: number;
   /** Công suất DC cần để sạc đầy / xả hết (kW) */
   requiredChargeDcKw: number;
   requiredDischargeDcKw: number;
@@ -266,7 +270,8 @@ export function suggestStorageConfig(i: StorageSuggestionInput, years = 10): Sto
   // Xả hết trong giờ cao điểm
   const requiredDischargeDcKw = (usable * eSide) / dischargeH;
   const requiredDischargeAcKw = (requiredDischargeDcKw * eDc);
-  const requiredInverterKw = Math.max(requiredChargeAcKw, requiredDischargeAcKw);
+  const requiredByPeakLoadKw = Math.max(0, i.peakLoadKw ?? 0);
+  const requiredInverterKw = Math.max(requiredChargeAcKw, requiredDischargeAcKw, requiredByPeakLoadKw);
   const inverterQty = Math.max(1, Math.ceil(requiredInverterKw / invKw - 1e-9));
 
   const autoDc = nominal * DEFAULT_C_RATE;
@@ -286,6 +291,7 @@ export function suggestStorageConfig(i: StorageSuggestionInput, years = 10): Sto
     requiredChargeAcKw,
     requiredDischargeAcKw,
     requiredInverterKw,
+    requiredByPeakLoadKw,
     requiredChargeDcKw,
     requiredDischargeDcKw,
     maxChargeDcKw,
@@ -295,4 +301,10 @@ export function suggestStorageConfig(i: StorageSuggestionInput, years = 10): Sto
     batteryQtyAfterFade,
     years,
   };
+}
+
+/** Dòng điện (A) ứng với công suất kW; 3 pha 380V hoặc 1 pha 220V, hệ số công suất 0,9 */
+export function currentAmps(kw: number, threePhase: boolean, powerFactor = 0.9): number {
+  const v = threePhase ? Math.sqrt(3) * 380 : 220;
+  return (Math.max(0, kw) * 1000) / (v * powerFactor);
 }
