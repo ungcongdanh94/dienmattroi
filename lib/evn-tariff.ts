@@ -2,7 +2,7 @@
  * BẢNG GIÁ ĐIỆN EVN — Sinh hoạt / Sản xuất / Kinh doanh
  * Sinh hoạt (5 bậc) và Sản xuất: Quyết định 2892/QĐ-BCT ngày 31/10/2026, hiệu lực từ 01/11/2026
  * (EVN giảm 2% giá bán lẻ bình quân còn 2.159,9037 đ/kWh — QĐ 1305/QĐ-EVN).
- * Kinh doanh: GIỮ NGUYÊN số cũ (QĐ 1279/QĐ-BCT) — chưa có bảng giá mới, cần cập nhật khi có.
+ * Kinh doanh: cũng theo QĐ 2892/QĐ-BCT (kinh doanh khác / lưu trú du lịch / trạm sạc xe điện).
  * Khung giờ cao điểm/thấp điểm: Quyết định 963/QĐ-BCT, Bộ Công Thương.
  *
  * ⚠️ QUAN TRỌNG: Giá điện SINH HOẠT áp dụng chung cho cả 1 pha và 3 pha — không có
@@ -47,7 +47,7 @@ const UNBOUNDED_KWH = 1_000_000;
 export const EVN_TARIFF_2026: EvnTariff = {
   effectiveFrom: "2026-11-01",
   source:
-    "QĐ 2892/QĐ-BCT ngày 31/10/2026 (sinh hoạt 5 bậc, sản xuất); kinh doanh: QĐ 1279/QĐ-BCT (chưa cập nhật)",
+    "QĐ 2892/QĐ-BCT ngày 31/10/2026 (sinh hoạt 5 bậc, sản xuất, kinh doanh)",
   vatRate: 0.08,
 
   // Sinh hoạt: 5 bậc lũy tiến (từ 01/11/2026) — áp dụng chung cho 1 pha và 3 pha, giá chưa VAT
@@ -67,11 +67,14 @@ export const EVN_TARIFF_2026: EvnTariff = {
     { voltageLabel: "Từ 220 kV trở lên", offPeak: 1101, normal: 1771, peak: 3110 },
   ],
 
-  // Kinh doanh: 3 cấp điện áp × 3 khung giờ, giá cố định (không lũy tiến)
+  // Kinh doanh (từ 01/11/2026, QĐ 2892/QĐ-BCT): 3 nhóm × 2 cấp điện áp × 3 khung giờ, giá cố định, chưa VAT
   kinhDoanhByVoltage: [
-    { voltageLabel: "Dưới 6 kV", offPeak: 1918, normal: 3152, peak: 5422 },
-    { voltageLabel: "6 kV - dưới 22 kV", offPeak: 1829, normal: 3108, peak: 5202 },
-    { voltageLabel: "Từ 22 kV trở lên", offPeak: 1609, normal: 2887, peak: 5025 },
+    { voltageLabel: "Kinh doanh khác — Hạ áp (đến 1 kV)", offPeak: 1880, normal: 3089, peak: 5313 },
+    { voltageLabel: "Kinh doanh khác — Trung áp trở lên (trên 1 kV)", offPeak: 1577, normal: 2829, peak: 4924 },
+    { voltageLabel: "Cơ sở lưu trú du lịch — Hạ áp (đến 1 kV)", offPeak: 1274, normal: 1966, peak: 3586 },
+    { voltageLabel: "Cơ sở lưu trú du lịch — Trung áp trở lên (trên 1 kV)", offPeak: 1166, normal: 1814, peak: 3348 },
+    { voltageLabel: "Trạm sạc xe điện — Hạ áp (đến 1 kV)", offPeak: 1620, normal: 2700, peak: 4212 },
+    { voltageLabel: "Trạm sạc xe điện — Trung áp trở lên (trên 1 kV)", offPeak: 1534, normal: 2549, peak: 3758 },
   ],
 };
 
@@ -157,3 +160,15 @@ export async function fetchLatestTariff(): Promise<EvnTariff> {
   if (!res.ok) throw new Error("Không lấy được bảng giá mới nhất");
   return res.json();
 }
+
+/**
+ * Khung giờ điện (QĐ 963/QĐ-BCT): cao điểm 17h30–22h30 từ thứ Hai đến thứ Bảy (Chủ nhật không có cao điểm);
+ * thấp điểm 0h–6h hàng ngày. Dùng để tính lãi khi mua điện thấp điểm sạc pin, xả giờ cao điểm.
+ */
+export const TOU_SCHEDULE = {
+  peakHoursPerDay: 5,
+  peakDaysPerYear: 312, // 26 ngày/tháng × 12 (thứ Hai–thứ Bảy)
+  offPeakHoursPerDay: 6,
+  peakLabel: "17h30–22h30 (thứ Hai–thứ Bảy)",
+  offPeakLabel: "0h–6h (hàng ngày)",
+} as const;

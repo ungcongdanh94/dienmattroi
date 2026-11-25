@@ -19,7 +19,8 @@ export interface QuoteExportData {
   siteAddress: string;
   systemLabel: string;
 
-  panel: { brand: string; wattage: number; qty: number; warranty: string };
+  /** null khi hệ thống chỉ lưu trữ (không có tấm pin) */
+  panel: { brand: string; wattage: number; qty: number; warranty: string } | null;
   inverter: { brand: string; kindLabel: string; phaseLabel: string; capacityKw: number; qty: number; warranty: string };
   battery: { brand: string; moduleKwh: number; qty: number; warranty: string } | null;
 
@@ -37,6 +38,16 @@ export interface QuoteExportData {
   showPrices: boolean;
 
   company: { fullName: string; hotline: string; website: string; address: string };
+
+  // ---- Tuỳ chọn (dùng cho báo giá hệ thống chỉ lưu trữ) ----
+  docTitle?: string;
+  subtitle?: string;
+  /** Thay 2 ô KPI đầu tiên (mặc định: công suất kWp, số tấm pin) */
+  kpiTiles?: [{ label: string; value: string; unit: string }, { label: string; value: string; unit: string }];
+  /** Dòng ghi chú dưới phần hiệu quả kinh tế (thay cho dòng "mức bù hoá đơn") */
+  ecoNote?: string;
+  /** Thay danh sách ghi chú mặc định */
+  notes?: string[];
 }
 
 export interface QuoteFonts {
@@ -164,12 +175,12 @@ export async function buildQuotePdf(data: QuoteExportData, fonts: QuoteFonts) {
   // ----- Tiêu đề -----
   font("bold", 15);
   color(C.navy);
-  doc.text("BÁO GIÁ HỆ THỐNG ĐIỆN MẶT TRỜI", M, y);
+  doc.text(data.docTitle ?? "BÁO GIÁ HỆ THỐNG ĐIỆN MẶT TRỜI", M, y);
   fill(C.gold);
   doc.rect(M, y + 3, 22, 0.8, "F");
   font("regular", 9);
   color(C.mute);
-  doc.text(`${data.systemLabel} · Công suất ${fmtNum(data.totalKwp)} kWp`, M, y + 10);
+  doc.text(data.subtitle ?? `${data.systemLabel} · Công suất ${fmtNum(data.totalKwp)} kWp`, M, y + 10);
   y += 15;
 
   // ----- Thông tin khách hàng -----
@@ -201,8 +212,12 @@ export async function buildQuotePdf(data: QuoteExportData, fonts: QuoteFonts) {
   const gap = 4;
   const tileW = (CW - gap * 3) / 4;
   const kpis: { label: string; value: string; unit: string; c: RGB }[] = [
-    { label: "CÔNG SUẤT HỆ THỐNG", value: fmtNum(data.totalKwp), unit: "kWp", c: C.navy },
-    { label: "SỐ TẤM PIN", value: groupThousands(data.panel.qty), unit: "tấm", c: C.navy },
+    data.kpiTiles
+      ? { ...data.kpiTiles[0], c: C.navy }
+      : { label: "CÔNG SUẤT HỆ THỐNG", value: fmtNum(data.totalKwp), unit: "kWp", c: C.navy },
+    data.kpiTiles
+      ? { ...data.kpiTiles[1], c: C.navy }
+      : { label: "SỐ TẤM PIN", value: groupThousands(data.panel?.qty ?? 0), unit: "tấm", c: C.navy },
     { label: "TIẾT KIỆM / THÁNG", value: groupThousands(data.savingsPerMonthVnd), unit: "đ", c: C.green },
     { label: "TỔNG THANH TOÁN", value: groupThousands(data.totalPaymentVnd), unit: "đ", c: C.navy },
   ];
@@ -304,14 +319,18 @@ export async function buildQuotePdf(data: QuoteExportData, fonts: QuoteFonts) {
   // ----- Cấu hình thiết bị -----
   sectionTitle("CẤU HÌNH THIẾT BỊ");
   const equipRows: string[][] = [
-    [
-      "Tấm pin",
-      data.panel.brand,
-      `${data.panel.wattage} Wp / tấm`,
-      `${groupThousands(data.panel.qty)} tấm`,
-      `${fmtNum((data.panel.qty * data.panel.wattage) / 1000)} kWp`,
-      dash(data.panel.warranty),
-    ],
+    ...(data.panel
+      ? [
+          [
+            "Tấm pin",
+            data.panel.brand,
+            `${data.panel.wattage} Wp / tấm`,
+            `${groupThousands(data.panel.qty)} tấm`,
+            `${fmtNum((data.panel.qty * data.panel.wattage) / 1000)} kWp`,
+            dash(data.panel.warranty),
+          ],
+        ]
+      : []),
     [
       "Biến tần (Inverter)",
       data.inverter.brand,
@@ -417,20 +436,23 @@ export async function buildQuotePdf(data: QuoteExportData, fonts: QuoteFonts) {
     doc.text(e.value, x + 5, y + 13.3);
   });
   y += 17;
-  if (data.offsetPercent !== null) {
+  const ecoNoteText = data.ecoNote ?? (data.offsetPercent !== null ? `Mức bù hoá đơn điện ước tính ≈ ${fmtNum(data.offsetPercent)}% theo công suất tấm pin thực tế.` : null);
+  if (ecoNoteText) {
     font("regular", 7.6);
     color(C.mute);
-    doc.text(`Mức bù hoá đơn điện ước tính ≈ ${fmtNum(data.offsetPercent)}% theo công suất tấm pin thực tế.`, M, y + 6);
-    y += 7;
+    const noteLines = doc.splitTextToSize(ecoNoteText, CW) as string[];
+    doc.text(noteLines, M, y + 6);
+    y += 1 + noteLines.length * 4.2 + 2;
   }
   y += 5;
 
   // ----- Ghi chú -----
-  ensureSpace(8 + NOTES.length * 6);
+  const notesList = data.notes ?? NOTES;
+  ensureSpace(8 + notesList.length * 6);
   sectionTitle("GHI CHÚ");
   font("regular", 8);
   color(C.mute);
-  NOTES.forEach((n) => {
+  notesList.forEach((n) => {
     const lines = doc.splitTextToSize(n, CW - 6) as string[];
     ensureSpace(lines.length * 4 + 2);
     fill(C.gold);
@@ -532,12 +554,12 @@ export async function buildQuoteXlsx(data: QuoteExportData): Promise<ArrayBuffer
 
   // Tiêu đề
   ws.mergeCells(r, 1, r, LASTCOL);
-  ws.getCell(r, 1).value = "BÁO GIÁ HỆ THỐNG ĐIỆN MẶT TRỜI";
+  ws.getCell(r, 1).value = data.docTitle ?? "BÁO GIÁ HỆ THỐNG ĐIỆN MẶT TRỜI";
   ws.getCell(r, 1).font = { name: FONT, size: 16, bold: true, color: { argb: NAVY } };
   ws.getRow(r).height = 26;
   r += 1;
   ws.mergeCells(r, 1, r, LASTCOL);
-  ws.getCell(r, 1).value = `${data.systemLabel}  ·  Công suất ${fmtNum(data.totalKwp)} kWp`;
+  ws.getCell(r, 1).value = data.subtitle ?? `${data.systemLabel}  ·  Công suất ${fmtNum(data.totalKwp)} kWp`;
   ws.getCell(r, 1).font = { name: FONT, size: 10, color: { argb: MUTE } };
   r += 2;
 
@@ -603,7 +625,7 @@ export async function buildQuoteXlsx(data: QuoteExportData): Promise<ArrayBuffer
 
   // Tổng quan nhanh (KPI)
   section("TỔNG QUAN HỆ THỐNG");
-  const kpiLabels = ["Công suất hệ thống", "Số tấm pin", "Tiết kiệm / tháng", "Tổng thanh toán"];
+  const kpiLabels = [data.kpiTiles?.[0].label ?? "Công suất hệ thống", data.kpiTiles?.[1].label ?? "Số tấm pin", "Tiết kiệm / tháng", "Tổng thanh toán"];
   const kpiCols: [number, number][] = [
     [1, 2],
     [3, 3],
@@ -611,8 +633,8 @@ export async function buildQuoteXlsx(data: QuoteExportData): Promise<ArrayBuffer
     [6, 7],
   ];
   const kpiVals: { v: ExcelJS_CellValue; fmt?: string; color: string }[] = [
-    { v: `${fmtNum(data.totalKwp)} kWp`, color: NAVY },
-    { v: `${groupThousands(data.panel.qty)} tấm`, color: NAVY },
+    { v: data.kpiTiles ? `${data.kpiTiles[0].value} ${data.kpiTiles[0].unit}` : `${fmtNum(data.totalKwp)} kWp`, color: NAVY },
+    { v: data.kpiTiles ? `${data.kpiTiles[1].value} ${data.kpiTiles[1].unit}` : `${groupThousands(data.panel?.qty ?? 0)} tấm`, color: NAVY },
     { v: data.savingsPerMonthVnd, fmt: MONEY, color: GREEN },
     { v: data.totalPaymentVnd, fmt: MONEY, color: NAVY },
   ];
@@ -644,7 +666,9 @@ export async function buildQuoteXlsx(data: QuoteExportData): Promise<ArrayBuffer
   section("CẤU HÌNH THIẾT BỊ");
   headerRow(["STT", "Hạng mục", "Thương hiệu", "Cấu hình", "Số lượng", "Tổng công suất", "Bảo hành"], ["center", "left", "left", "left", "right", "right", "left"]);
   const equip: string[][] = [
-    ["Tấm pin", data.panel.brand, `${data.panel.wattage} Wp / tấm`, `${groupThousands(data.panel.qty)} tấm`, `${fmtNum((data.panel.qty * data.panel.wattage) / 1000)} kWp`, dash(data.panel.warranty)],
+    ...(data.panel
+      ? [["Tấm pin", data.panel.brand, `${data.panel.wattage} Wp / tấm`, `${groupThousands(data.panel.qty)} tấm`, `${fmtNum((data.panel.qty * data.panel.wattage) / 1000)} kWp`, dash(data.panel.warranty)]]
+      : []),
     [
       "Biến tần (Inverter)",
       data.inverter.brand,
@@ -781,18 +805,20 @@ export async function buildQuoteXlsx(data: QuoteExportData): Promise<ArrayBuffer
     ws.getRow(r).height = 22;
     r += 1;
   });
-  if (data.offsetPercent !== null) {
+  const xlsxEcoNote = data.ecoNote ?? (data.offsetPercent !== null ? `Mức bù hoá đơn điện ước tính ≈ ${fmtNum(data.offsetPercent)}% theo công suất tấm pin thực tế.` : null);
+  if (xlsxEcoNote) {
     ws.mergeCells(r, 1, r, LASTCOL);
-    ws.getCell(r, 1).value = `Mức bù hoá đơn điện ước tính ≈ ${fmtNum(data.offsetPercent)}% theo công suất tấm pin thực tế.`;
+    ws.getCell(r, 1).value = xlsxEcoNote;
     ws.getCell(r, 1).font = { name: FONT, size: 9, italic: true, color: { argb: MUTE } };
-    ws.getCell(r, 1).alignment = { indent: 1 };
+    ws.getCell(r, 1).alignment = { indent: 1, wrapText: true, vertical: "top" };
+    if (xlsxEcoNote.length > 110) ws.getRow(r).height = 14 * Math.ceil(xlsxEcoNote.length / 110);
     r += 1;
   }
   r += 1;
 
   // Ghi chú
   section("GHI CHÚ");
-  NOTES.forEach((n) => {
+  (data.notes ?? NOTES).forEach((n) => {
     ws.mergeCells(r, 1, r, LASTCOL);
     ws.getCell(r, 1).value = `•  ${n}`;
     ws.getCell(r, 1).font = { name: FONT, size: 9.5, color: { argb: MUTE } };

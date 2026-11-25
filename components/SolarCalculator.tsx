@@ -47,6 +47,7 @@ import {
 } from "@/lib/quote-financials";
 import { COMPANY } from "@/lib/site-data";
 import type { QuoteExportData } from "@/lib/quote-export";
+import StorageOnlyCalculator from "@/components/StorageOnlyCalculator";
 
 const SYSTEM_LABEL: Record<SystemType, { title: string; desc: string }> = {
   on_grid: { title: "On-grid", desc: "Hoà lưới, không pin — bù hoá đơn tiền điện" },
@@ -162,6 +163,7 @@ export default function SolarCalculator() {
 
   const reportRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState<"png" | "pdf" | "xlsx" | null>(null);
+  const [mode, setMode] = useState<"pv" | "storage">("pv");
   const [customerView, setCustomerView] = useState<boolean>(true);
   const [staffAuthenticated, setStaffAuthenticated] = useState<boolean | null>(null);
   const [showStaffLogin, setShowStaffLogin] = useState(false);
@@ -701,6 +703,61 @@ export default function SolarCalculator() {
     }
   }
 
+  const staffControls = (
+            <div className="relative flex items-center gap-2">
+              {canViewInternal ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setCustomerView((v) => !v)}
+                    className={[
+                      "rounded-full border px-4 py-1.5 text-xs font-semibold transition-colors",
+                      effectiveCustomerView ? "border-navy bg-navy text-white" : "border-line bg-white text-ink/70 hover:border-navy/40",
+                    ].join(" ")}
+                  >
+                    {effectiveCustomerView ? "Đang xem: Khách hàng (chỉ tổng tiền)" : "Đang xem: Nội bộ (đầy đủ chi tiết)"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleStaffLogout}
+                    className="rounded-full border border-line bg-white px-3 py-1.5 text-xs text-ink/50 hover:border-navy/40"
+                  >
+                    Đăng xuất
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowStaffLogin((v) => !v)}
+                  className="rounded-full border border-line bg-white px-4 py-1.5 text-xs font-semibold text-ink/70 hover:border-navy/40"
+                >
+                  Đang xem: Khách hàng (chỉ tổng tiền) · Đăng nhập nội bộ
+                </button>
+              )}
+
+              {showStaffLogin && !canViewInternal && (
+                <form
+                  onSubmit={handleStaffLogin}
+                  className="absolute right-0 top-full z-10 mt-2 w-64 rounded-xl border border-line bg-white p-4 shadow-lg"
+                >
+                  <p className="text-xs font-semibold text-navy">Đăng nhập nội bộ</p>
+                  <input
+                    type="password"
+                    autoFocus
+                    value={staffPassword}
+                    onChange={(e) => setStaffPassword(e.target.value)}
+                    placeholder="Mật khẩu"
+                    className="mt-2 w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
+                  />
+                  {staffLoginError && <p className="mt-1.5 text-xs text-red-600">{staffLoginError}</p>}
+                  <button type="submit" className="mt-2 w-full rounded-lg bg-navy py-2 text-xs font-semibold text-white">
+                    Đăng nhập
+                  </button>
+                </form>
+              )}
+            </div>
+  );
+
   return (
     <div className="min-h-screen bg-surface font-body text-ink">
       <div ref={reportRef} className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
@@ -726,6 +783,31 @@ export default function SolarCalculator() {
           </div>
         </section>
 
+        {/* Chọn chế độ */}
+        <section className="mb-8">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {([
+              { key: "pv", title: "Điện mặt trời", desc: "Tấm pin + inverter (+ pin lưu trữ) — bù hoá đơn tiền điện" },
+              { key: "storage", title: "Chỉ lưu trữ (không tấm pin)", desc: "Mua điện thấp điểm sạc pin, xả giờ cao điểm — khách sản xuất / kinh doanh" },
+            ] as const).map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => setMode(m.key)}
+                className={[
+                  "rounded-2xl border p-4 text-left transition-colors",
+                  mode === m.key ? "border-navy bg-navy text-white" : "border-line bg-white text-ink hover:border-navy/40",
+                ].join(" ")}
+              >
+                <div className="text-sm font-semibold">{m.title}</div>
+                <div className={`mt-1 text-xs ${mode === m.key ? "text-white/60" : "text-ink/50"}`}>{m.desc}</div>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {mode === "pv" ? (
+          <>
         {/* Form + sticky meter */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
           {/* Left: inputs */}
@@ -1220,58 +1302,7 @@ export default function SolarCalculator() {
         <section className="mt-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-display text-lg font-semibold text-navy">Bảng kê vật tư &amp; báo giá</h2>
-            <div className="relative flex items-center gap-2">
-              {canViewInternal ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setCustomerView((v) => !v)}
-                    className={[
-                      "rounded-full border px-4 py-1.5 text-xs font-semibold transition-colors",
-                      effectiveCustomerView ? "border-navy bg-navy text-white" : "border-line bg-white text-ink/70 hover:border-navy/40",
-                    ].join(" ")}
-                  >
-                    {effectiveCustomerView ? "Đang xem: Khách hàng (chỉ tổng tiền)" : "Đang xem: Nội bộ (đầy đủ chi tiết)"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleStaffLogout}
-                    className="rounded-full border border-line bg-white px-3 py-1.5 text-xs text-ink/50 hover:border-navy/40"
-                  >
-                    Đăng xuất
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowStaffLogin((v) => !v)}
-                  className="rounded-full border border-line bg-white px-4 py-1.5 text-xs font-semibold text-ink/70 hover:border-navy/40"
-                >
-                  Đang xem: Khách hàng (chỉ tổng tiền) · Đăng nhập nội bộ
-                </button>
-              )}
-
-              {showStaffLogin && !canViewInternal && (
-                <form
-                  onSubmit={handleStaffLogin}
-                  className="absolute right-0 top-full z-10 mt-2 w-64 rounded-xl border border-line bg-white p-4 shadow-lg"
-                >
-                  <p className="text-xs font-semibold text-navy">Đăng nhập nội bộ</p>
-                  <input
-                    type="password"
-                    autoFocus
-                    value={staffPassword}
-                    onChange={(e) => setStaffPassword(e.target.value)}
-                    placeholder="Mật khẩu"
-                    className="mt-2 w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
-                  />
-                  {staffLoginError && <p className="mt-1.5 text-xs text-red-600">{staffLoginError}</p>}
-                  <button type="submit" className="mt-2 w-full rounded-lg bg-navy py-2 text-xs font-semibold text-white">
-                    Đăng nhập
-                  </button>
-                </form>
-              )}
-            </div>
+            {staffControls}
           </div>
           <p className="mt-1 text-[13px] text-ink/55">
             Toàn bộ đơn giá được quản lý tại{" "}
@@ -1568,6 +1599,19 @@ export default function SolarCalculator() {
             {exporting === "png" ? "Đang xuất…" : "Xuất ảnh PNG (toàn trang)"}
           </button>
         </div>
+          </>
+        ) : (
+          <StorageOnlyCalculator
+            catalog={catalog}
+            tariff={tariff}
+            quoteCode={quoteCode}
+            customerName={customerName}
+            customerPhone={customerPhone}
+            siteAddress={siteAddress}
+            effectiveCustomerView={effectiveCustomerView}
+            staffControls={staffControls}
+          />
+        )}
       </div>
     </div>
   );
