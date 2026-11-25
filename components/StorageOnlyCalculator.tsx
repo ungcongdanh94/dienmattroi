@@ -6,6 +6,7 @@ import { TOU_SCHEDULE, type EvnTariff } from "@/lib/evn-tariff";
 import {
   calculateStorageArbitrage,
   projectStorage,
+  suggestStorageConfig,
   DEFAULT_C_RATE,
   DEFAULT_STORAGE_PARAMS,
   type StorageLimit,
@@ -163,6 +164,18 @@ export default function StorageOnlyCalculator({
     [batteryKwh, inverterKw, peakLoadKwhPerDay, tou, tariff.vatRate, params],
   );
   const calc = useMemo(() => calculateStorageArbitrage(storageInput), [storageInput]);
+  const suggestion = useMemo(
+    () =>
+      suggestStorageConfig({
+        peakLoadKwhPerDay,
+        batteryModuleKwh: battery?.moduleKwh ?? 0,
+        inverterModelKw: inverter?.capacityKw ?? 0,
+        params: { acToDcEff: params.acToDcEff, dcToAcEff: params.dcToAcEff, batteryRoundTripEff: params.batteryRoundTripEff, dod: params.dod, annualFadePercent: params.annualFadePercent },
+        maxChargeDcKw: chargeAuto ? null : maxChargeManualKw,
+        maxDischargeDcKw: dischargeAuto ? null : maxDischargeManualKw,
+      }),
+    [peakLoadKwhPerDay, battery, inverter, params, chargeAuto, dischargeAuto, maxChargeManualKw, maxDischargeManualKw],
+  );
 
   // ----- Báo giá -----
   const items: QuoteItem[] = useMemo(() => {
@@ -452,10 +465,49 @@ export default function StorageOnlyCalculator({
             Mặc định: inverter 97% mỗi chiều, pin 96% sạc–xả (cả chuỗi ≈ 90%), DoD 90%, suy giảm 2%/năm, sạc/xả DC tối đa = {DEFAULT_C_RATE}C (một nửa dung lượng pin mỗi giờ). Nhập theo datasheet của thiết bị thực tế để chính xác hơn.
           </p>
         </details>
-        {peakLoadKwhPerDay > 0 && (
-          <p className="mt-3 text-[13px] text-ink/55">
-            Gợi ý để bù hết điện giờ cao điểm: pin ≈ <strong>{num1(calc.suggestedBatteryKwh)} kWh</strong>, inverter ≈ <strong>{num1(calc.suggestedInverterKw)} kW</strong> trở lên.
-          </p>
+        {suggestion && (
+          <div className="mt-4 rounded-xl border border-energy/40 bg-[#FFF9EC] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm font-semibold text-navy">
+                Gợi ý: {suggestion.batteryQty} pin {battery?.moduleKwh} kWh ({num1(suggestion.batteryNominalKwh)} kWh) + {suggestion.inverterQty} inverter {inverter?.capacityKw} kW ({num1(suggestion.inverterQty * (inverter?.capacityKw ?? 0))} kW)
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setBatQty(suggestion.batteryQty);
+                  setInvQty(suggestion.inverterQty);
+                }}
+                disabled={batQty === suggestion.batteryQty && invQty === suggestion.inverterQty}
+                className="rounded-full bg-navy px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+              >
+                {batQty === suggestion.batteryQty && invQty === suggestion.inverterQty ? "Đang áp dụng" : "Áp dụng gợi ý"}
+              </button>
+            </div>
+            <ul className="mt-2 list-disc space-y-1 pl-4 text-[13px] text-ink/65">
+              <li>
+                Bù hết {num1(peakLoadKwhPerDay)} kWh điện giờ cao điểm cần pin dùng được ≈ {num1(suggestion.usableKwh)} kWh (xả ra {num1(suggestion.dischargeAcKwh)} kWh sau tổn hao).
+              </li>
+              <li>
+                Sạc đầy trong {TOU_SCHEDULE.offPeakHoursPerDay} giờ thấp điểm cần inverter ≥ {num1(suggestion.requiredChargeAcKw)} kW (AC) · sạc DC ≥ {num1(suggestion.requiredChargeDcKw)} kW.
+              </li>
+              <li>
+                Xả hết trong {TOU_SCHEDULE.peakHoursPerDay} giờ cao điểm cần inverter ≥ {num1(suggestion.requiredDischargeAcKw)} kW (AC) · xả DC ≥ {num1(suggestion.requiredDischargeDcKw)} kW.
+              </li>
+              {suggestion.batteryQtyAfterFade > suggestion.batteryQty && (
+                <li>
+                  Pin suy giảm {fadePctPerYear}%/năm: để sau {suggestion.years} năm vẫn bù đủ tải cần {suggestion.batteryQtyAfterFade} pin ({num1(suggestion.batteryQtyAfterFade * (battery?.moduleKwh ?? 0))} kWh) — đầu tư thêm {suggestion.batteryQtyAfterFade - suggestion.batteryQty} pin.
+                </li>
+              )}
+              {(suggestion.chargeDcTooLow || suggestion.dischargeDcTooLow) && (
+                <li className="text-red-600">
+                  Mức {suggestion.chargeDcTooLow ? `sạc DC tối đa (${num1(suggestion.maxChargeDcKw)} kW)` : ""}
+                  {suggestion.chargeDcTooLow && suggestion.dischargeDcTooLow ? " và " : ""}
+                  {suggestion.dischargeDcTooLow ? `xả DC tối đa (${num1(suggestion.maxDischargeDcKw)} kW)` : ""} đang thấp hơn mức cần — nâng thông số trong khung bên dưới hoặc chọn thêm pin.
+                </li>
+              )}
+            </ul>
+            <p className="mt-2 text-xs text-ink/45">Gợi ý dùng đúng loại inverter và pin đang chọn ở trên và các thông số kỹ thuật trong khung bên dưới.</p>
+          </div>
         )}
       </section>
 
