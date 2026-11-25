@@ -242,6 +242,8 @@ export interface ActualEnergyInput {
   inverterTotalKw: number;
   /** Điện tiêu thụ của khách mỗi tháng (kWh) */
   monthlyKwh: number;
+  /** Hiệu suất inverter DC→AC (0–1). Mặc định 1 = không tính tổn hao */
+  inverterEff?: number;
 }
 
 export interface ActualEnergyResult {
@@ -262,11 +264,11 @@ export interface ActualEnergyResult {
 }
 
 /** Sản lượng & mức bù tính từ THIẾT BỊ ĐÃ CHỌN (tấm pin + inverter), khác với phần dự toán theo nhu cầu. */
-export function calculateActualEnergy({ pvKwp, inverterTotalKw, monthlyKwh }: ActualEnergyInput): ActualEnergyResult {
+export function calculateActualEnergy({ pvKwp, inverterTotalKw, monthlyKwh, inverterEff = 1 }: ActualEnergyInput): ActualEnergyResult {
   const maxPvForInverterKwp = inverterTotalKw * MAX_DC_AC_RATIO;
   const inverterLimited = pvKwp > maxPvForInverterKwp + 1e-9;
   const usablePvKwp = Math.max(0, Math.min(pvKwp, maxPvForInverterKwp));
-  const productionKwhMonth = usablePvKwp * FIXED_PEAK_SUN_HOURS * 30;
+  const productionKwhMonth = usablePvKwp * FIXED_PEAK_SUN_HOURS * 30 * Math.min(1, Math.max(0.01, inverterEff));
   const coveredKwhMonth = Math.min(productionKwhMonth, Math.max(0, monthlyKwh));
   const coveredPercent = monthlyKwh > 0 ? Math.min(100, (coveredKwhMonth / monthlyKwh) * 100) : 0;
   return {
