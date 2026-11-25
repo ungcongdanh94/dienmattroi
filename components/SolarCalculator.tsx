@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   calculateSolarSystem,
-  FIXED_PEAK_SUN_HOURS,
+  calculateActualEnergy,
+  MAX_DC_AC_RATIO,
   type BatteryType,
   type SystemType,
 } from "@/lib/solar-calculator";
@@ -48,6 +49,8 @@ import {
 import { COMPANY } from "@/lib/site-data";
 import type { QuoteExportData } from "@/lib/quote-export";
 import StorageOnlyCalculator from "@/components/StorageOnlyCalculator";
+import { TOU_SCHEDULE } from "@/lib/evn-tariff";
+import { DEFAULT_PV_TECH, projectPvSystem, suggestPvStorage, batteryValue, type PvTechParams } from "@/lib/pv-storage";
 
 const SYSTEM_LABEL: Record<SystemType, { title: string; desc: string }> = {
   on_grid: { title: "On-grid", desc: "Hoà lưới, không pin — bù hoá đơn tiền điện" },
@@ -119,6 +122,14 @@ export default function SolarCalculator() {
   const [inverterId, setInverterId] = useState<string>(FALLBACK_CATALOG.inverters[0].id);
   const [batteryBrand, setBatteryBrand] = useState<string>(FALLBACK_CATALOG.batteries[0].brand);
   const [batteryId, setBatteryId] = useState<string>(FALLBACK_CATALOG.batteries[0].id);
+  // Thông số tổn hao & suy giảm (hiệu chỉnh được)
+  const [invDcAcPct, setInvDcAcPct] = useState<number>(DEFAULT_PV_TECH.inverterDcAcEff * 100);
+  const [invAcDcPct, setInvAcDcPct] = useState<number>(DEFAULT_PV_TECH.inverterAcDcEff * 100);
+  const [batEffPct, setBatEffPct] = useState<number>(DEFAULT_PV_TECH.batteryRoundTripEff * 100);
+  const [dodPct, setDodPct] = useState<number>(Math.round(DEFAULT_PV_TECH.dod * 100));
+  const [panelFadePct, setPanelFadePct] = useState<number>(DEFAULT_PV_TECH.panelFadePercent);
+  const [batFadePct, setBatFadePct] = useState<number>(DEFAULT_PV_TECH.batteryFadePercent);
+  const [gridCharge, setGridCharge] = useState<boolean>(false);
   const [panelCountManual, setPanelCountManual] = useState<number>(0);
   const [inverterCountManual, setInverterCountManual] = useState<number>(1);
   const [batteryCountManual, setBatteryCountManual] = useState<number>(0);
@@ -420,15 +431,94 @@ export default function SolarCalculator() {
   // vì thường lớn hơn công suất yêu cầu (result.pvSizeKwp) do làm tròn số tấm lên.
   const actualCapacityKwp = selectedPanel && equipment ? (equipment.panelCount * selectedPanel.wattage) / 1000 : 0;
 
-  // Sản lượng điện THỰC TẾ theo công suất tấm pin đã chọn (số tấm có thể đã sửa tay) —
-  // dùng để tính lại toàn bộ phân tích tài chính (tiết kiệm/hoàn vốn/khấu hao/IRR) thay vì
-  // chỉ dựa theo % bù hoá đơn lý thuyết lúc đầu, vì số tấm thực tế có thể khác công suất đề xuất.
-  const actualMonthlyProductionKwh = actualCapacityKwp * FIXED_PEAK_SUN_HOURS * 30;
-  // Mức bù hoá đơn THỰC TẾ (giới hạn tối đa 100%) suy ra từ sản lượng thực tế so với tiêu thụ.
-  const effectiveOffsetPercent =
-    systemType !== "off_grid" && monthlyKwh > 0
-      ? Math.min(100, round1((actualMonthlyProductionKwh / monthlyKwh) * 100))
-      : offsetPercent;
+  // Sản lượng điện THỰC TẾ tính từ THIẾT BỊ ĐÃ CHỌN (số tấm pin × công suất, giới hạn bởi inverter đã chọn).
+  // Phần phía trên "Chọn combo thiết bị" chỉ là dự toán/tham khảo; mọi số liệu từ đây trở xuống
+  // (tiết kiệm, hoàn vốn, khấu hao, IRR, carbon, file báo giá) dùng kết quả này.
+  const pvTech: PvTechParams = useMemo(
+    () => ({
+      inverterDcAcEff: invDcAcPct / 100,
+      inverterAcDcEff: invAcDcPct / 100,
+      batteryRoundTripEff: batEffPct / 100,
+      dod: dodPct / 100,
+      panelFadePercent: panelFadePct,
+      batteryFadePercent: batFadePct,
+    }),
+    [invDcAcPct, invAcDcPct, batEffPct, dodPct, panelFadePct, batFadePct],
+  );
+  const inverterTotalKw = (selectedInverter?.capacityKw ?? 0) * Math.max(0, inverterCountManual);
+  const energy = useMemo(
+    () =>
+      calculateActualEnergy({
+        pvKwp: actualCapacityKwp,
+        inverterTotalKw,
+        monthlyKwh,
+        inverterEff: pvTech.inverterDcAcEff,
+      }),
+    [actualCapacityKwp, inverterTotalKw, monthlyKwh, pvTech.inverterDcAcEff],
+  );
+  // Mức bù hoá đơn THỰC TẾ (tối đa 100%) theo sản lượng thực tế so với nhu cầu điện.
+  const effectiveOffsetPercent = energy.coveredPercent;
+
+  // ----- Pin lưu trữ (hệ hybrid) tính ra tiền: điện dư + (tuỳ chọn) sạc lưới giờ thấp điểm, xả giờ cao điểm -----
+  const isTou = customerType !== "sinh_hoat";
+  const hasBatteryHybrid =
+    systemType === "hybrid" && !!selectedBattery && (equipment?.batteryModuleCount ?? 0) > 0;
+  const avgPriceVndPerKwh = monthlyKwh > 0 ? estimatedBillVnd / monthlyKwh : 0;
+  const storedValuePerKwh = isTou && selectedVoltage ? selectedVoltage.peak * (1 + tariff.vatRate) : avgPriceVndPerKwh;
+  const offPeakPerKwh = isTou && selectedVoltage ? selectedVoltage.offPeak * (1 + tariff.vatRate) : 0;
+  const gridChargeEffective = gridCharge && isTou;
+  // Điện khách dùng trong khung xả: khách TOU = phần giờ cao điểm (thứ Hai–thứ Bảy); sinh hoạt = điện ban đêm.
+  const peakLoadKwhPerDay = isTou ? (monthlyKwh * peakPercent) / 100 / 26 : result.nightKwh;
+  const batteryKwhActual = selectedBattery ? Math.max(0, batteryCountManual) * selectedBattery.moduleKwh : 0;
+  const batteryInput = hasBatteryHybrid
+    ? {
+        batteryNominalKwh: batteryKwhActual,
+        peakLoadKwhPerDay,
+        valuePerKwh: storedValuePerKwh,
+        gridChargeEnabled: gridChargeEffective,
+        offPeakPerKwh,
+        daysPerYear: isTou ? TOU_SCHEDULE.peakDaysPerYear : 365,
+      }
+    : null;
+  const pvRows = useMemo(
+    () =>
+      projectPvSystem({
+        pvKwp: actualCapacityKwp,
+        inverterTotalKw,
+        monthlyKwh,
+        systemType,
+        billVnd: estimatedBillVnd,
+        params: pvTech,
+        inflationPercent,
+        battery: batteryInput,
+        years: 25,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [actualCapacityKwp, inverterTotalKw, monthlyKwh, systemType, estimatedBillVnd, pvTech, inflationPercent, hasBatteryHybrid, batteryKwhActual, peakLoadKwhPerDay, storedValuePerKwh, offPeakPerKwh, gridChargeEffective, isTou],
+  );
+  const batteryDetail = useMemo(
+    () =>
+      batteryInput
+        ? batteryValue({ ...batteryInput, inverterTotalKw, surplusKwhPerDay: energy.surplusKwhMonth / 30, params: pvTech })
+        : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hasBatteryHybrid, batteryKwhActual, peakLoadKwhPerDay, storedValuePerKwh, offPeakPerKwh, gridChargeEffective, isTou, inverterTotalKw, energy.surplusKwhMonth, pvTech],
+  );
+  const pvSuggestion = useMemo(
+    () =>
+      suggestPvStorage({
+        pvKwp: actualCapacityKwp,
+        batteryModuleKwh: systemType !== "on_grid" && selectedBattery ? selectedBattery.moduleKwh : 0,
+        inverterModelKw: selectedInverter?.capacityKw ?? 0,
+        params: pvTech,
+        surplusKwhPerDay: energy.surplusKwhMonth / 30,
+        peakLoadKwhPerDay,
+        gridChargeEnabled: gridChargeEffective,
+        backupBatteryCount: systemType === "hybrid" ? suggestedBatteryCount : 0,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [actualCapacityKwp, systemType, selectedBattery, selectedInverter, pvTech, energy.surplusKwhMonth, peakLoadKwhPerDay, gridChargeEffective, suggestedBatteryCount],
+  );
 
   useEffect(() => {
     if (!actualCapacityKwp) return;
@@ -504,9 +594,32 @@ export default function SolarCalculator() {
   const sub = subtotal(items);
   const totalPayment = totalAfterDiscount(sub, discountPercent);
 
-  const savingsPerMonth = monthlySavingsVnd({ systemType, currentBillVnd: estimatedBillVnd, offsetPercent: effectiveOffsetPercent });
+  const savingsPvPerMonth = monthlySavingsVnd({ systemType, currentBillVnd: estimatedBillVnd, offsetPercent: effectiveOffsetPercent });
+  const savingsBatteryPerMonth = Math.round((pvRows[0]?.batterySavingsVnd ?? 0) / 12);
+  const savingsPerMonth = savingsPvPerMonth + savingsBatteryPerMonth;
   const savingsPerYear = savingsPerMonth * 12;
-  const paybackYears = simplePaybackYears(totalPayment, savingsPerMonth);
+  // Hoàn vốn có tính tấm pin / pin lưu trữ suy giảm theo năm (chưa tính giá điện tăng)
+  const paybackYears = useMemo(() => {
+    const rows0 = projectPvSystem({
+      pvKwp: actualCapacityKwp,
+      inverterTotalKw,
+      monthlyKwh,
+      systemType,
+      billVnd: estimatedBillVnd,
+      params: pvTech,
+      inflationPercent: 0,
+      battery: batteryInput,
+      years: 40,
+    });
+    let cum = 0;
+    for (const r of rows0) {
+      const before = cum;
+      cum += r.totalVnd;
+      if (totalPayment > 0 && cum >= totalPayment && r.totalVnd > 0) return round1(r.year - 1 + (totalPayment - before) / r.totalVnd);
+    }
+    return Infinity;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actualCapacityKwp, inverterTotalKw, monthlyKwh, systemType, estimatedBillVnd, pvTech, hasBatteryHybrid, batteryKwhActual, peakLoadKwhPerDay, storedValuePerKwh, offPeakPerKwh, gridChargeEffective, isTou, totalPayment]);
   const loan = calculateLoan({ totalInvestmentVnd: totalPayment, loanPercent, interestRatePercent, termYears: loanTermYears, annualSavingsVnd: savingsPerYear });
 
   const hasBatteryItem = items.some((it) => it.id === "battery");
@@ -527,7 +640,8 @@ export default function SolarCalculator() {
   const totalDepreciationPerYear = depreciationRows.reduce((s, r) => s + r.perYearVnd, 0);
   const totalDepreciationPerMonth = depreciationRows.reduce((s, r) => s + r.perMonthVnd, 0);
 
-  const cashFlows = buildProjectCashFlows(totalPayment, savingsPerYear, 25, inflationPercent);
+  // Dòng tiền từng năm: tấm pin/pin lưu trữ suy giảm, giá điện tăng theo lạm phát (thông số chỉnh được ở phần thiết bị)
+  const cashFlows = [-totalPayment, ...pvRows.map((r) => r.totalVnd)];
   const irr = estimateIRR(cashFlows);
   const irrConclusion =
     irr === null
@@ -539,9 +653,20 @@ export default function SolarCalculator() {
           : "Cân nhắc lại";
 
   const priceVndPerKwh = monthlyKwh > 0 ? Math.round(estimatedBillVnd / monthlyKwh) : 0;
-  const projection10Y = project10YearSavings(priceVndPerKwh, savingsPerYear, inflationPercent);
+  const projection10Y = (() => {
+    let cumulative = 0;
+    return pvRows.slice(0, 10).map((r) => {
+      cumulative += r.totalVnd;
+      return {
+        year: r.year,
+        avgPriceVndPerKwh: Math.round(priceVndPerKwh * r.inflationFactor),
+        savingsThisYearVnd: r.totalVnd,
+        cumulativeSavingsVnd: cumulative,
+      };
+    });
+  })();
 
-  const annualProductionKwh = systemType === "off_grid" ? monthlyKwh * 12 : monthlyKwh * 12 * (effectiveOffsetPercent / 100);
+  const annualProductionKwh = energy.coveredKwhMonth * 12;
   const carbon = calculateCarbon(annualProductionKwh, carbonPriceUsd, usdVndRate);
 
   async function handleExport(kind: "png") {
@@ -658,6 +783,10 @@ export default function SolarCalculator() {
       savingsPerYearVnd: savingsPerYear,
       paybackYears: paybackYears === Infinity || paybackYears <= 0 ? null : paybackYears,
       offsetPercent: systemType === "off_grid" ? null : effectiveOffsetPercent,
+      ecoNote:
+        savingsBatteryPerMonth > 0
+          ? `Tiết kiệm gồm điện mặt trời ≈ ${vnd(savingsPvPerMonth)}/tháng (bù ≈ ${effectiveOffsetPercent}% hoá đơn) và pin lưu trữ ≈ ${vnd(savingsBatteryPerMonth)}/tháng. Đã tính hiệu suất inverter ${invDcAcPct}%, tấm pin suy giảm ${panelFadePct}%/năm, pin lưu trữ suy giảm ${batFadePct}%/năm.`
+          : `Mức bù hoá đơn điện ước tính ≈ ${systemType === "off_grid" ? 100 : effectiveOffsetPercent}% theo công suất tấm pin thực tế. Đã tính hiệu suất inverter ${invDcAcPct}% và tấm pin suy giảm ${panelFadePct}%/năm.`,
       items,
       subtotalVnd: sub,
       discountPercent,
@@ -1294,6 +1423,72 @@ export default function SolarCalculator() {
               <p className="mt-3 text-[12px] text-ink/45">
                 Số tấm pin gợi ý theo công suất đề xuất là {suggestedPanelCount} tấm, số module pin lưu trữ gợi ý là {suggestedBatteryCount} module — có thể sửa lại số lượng thực tế, công suất và các giá trị khác sẽ tự cập nhật theo.
               </p>
+
+              {pvSuggestion && (
+                <div className="mt-4 rounded-xl border border-energy/40 bg-[#FFF9EC] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-navy">
+                      Gợi ý: {pvSuggestion.inverterQty} inverter {selectedInverter.capacityKw} kW ({round1(pvSuggestion.inverterQty * selectedInverter.capacityKw)} kW)
+                      {pvSuggestion.batteryQty > 0 && selectedBattery ? ` + ${pvSuggestion.batteryQty} pin ${selectedBattery.moduleKwh} kWh (${round1(pvSuggestion.batteryNominalKwh)} kWh)` : ""}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInverterCountManual(pvSuggestion.inverterQty);
+                        if (pvSuggestion.batteryQty > 0 && equipment.batteryModuleCount !== null) setBatteryCountManual(pvSuggestion.batteryQty);
+                      }}
+                      disabled={inverterCountManual === pvSuggestion.inverterQty && (pvSuggestion.batteryQty === 0 || batteryCountManual === pvSuggestion.batteryQty)}
+                      className="rounded-full bg-navy px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+                    >
+                      {inverterCountManual === pvSuggestion.inverterQty && (pvSuggestion.batteryQty === 0 || batteryCountManual === pvSuggestion.batteryQty) ? "Đang áp dụng" : "Áp dụng gợi ý"}
+                    </button>
+                  </div>
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-[13px] text-ink/65">
+                    <li>
+                      Tấm pin {round1(actualCapacityKwp)} kWp, tỉ lệ DC/AC tối đa {MAX_DC_AC_RATIO} → inverter ≥ {round1(pvSuggestion.requiredByPvKw)} kW.
+                    </li>
+                    {pvSuggestion.batteryQty > 0 && (
+                      <>
+                        <li>
+                          Xả hết pin trong {TOU_SCHEDULE.peakHoursPerDay} giờ cao điểm cần inverter ≥ {round1(pvSuggestion.requiredDischargeAcKw)} kW
+                          {pvSuggestion.requiredChargeAcKw > 0 ? `; sạc đầy trong ${TOU_SCHEDULE.offPeakHoursPerDay} giờ thấp điểm cần ≥ ${round1(pvSuggestion.requiredChargeAcKw)} kW` : ""}.
+                        </li>
+                        <li>
+                          Số pin = lớn hơn giữa nhu cầu dự phòng ban đêm ({pvSuggestion.backupBatteryCount} module) và nhu cầu xả có lãi ({pvSuggestion.monetizationBatteryQty} module: điện dư{gridChargeEffective ? " + sạc lưới thấp điểm" : ""}).
+                        </li>
+                      </>
+                    )}
+                  </ul>
+                </div>
+              )}
+
+              <details className="mt-4 rounded-xl border border-line bg-white p-4">
+                <summary className="cursor-pointer text-sm font-semibold text-navy">Thông số tổn hao &amp; suy giảm (có thể hiệu chỉnh)</summary>
+                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {([
+                    ["Hiệu suất inverter DC→AC, %", invDcAcPct, setInvDcAcPct],
+                    ["Hiệu suất inverter AC→DC (sạc), %", invAcDcPct, setInvAcDcPct],
+                    ["Hiệu suất sạc–xả của pin, %", batEffPct, setBatEffPct],
+                    ["Độ sâu xả (DoD), %", dodPct, setDodPct],
+                    ["Tấm pin suy giảm, %/năm", panelFadePct, setPanelFadePct],
+                    ["Pin lưu trữ suy giảm, %/năm", batFadePct, setBatFadePct],
+                  ] as [string, number, (v: number) => void][]).map(([label, val, set]) => (
+                    <div key={label} className="rounded-xl bg-surface p-3">
+                      <div className="text-xs text-ink/50">{label}</div>
+                      <NumInput min={0} max={100} step={0.5} value={val} onChange={(v) => set(Math.min(100, Math.max(0, v)))} className="mt-1 w-full rounded-md border border-line bg-white px-2.5 py-1.5 font-mono focus:border-navy focus:outline-none" />
+                    </div>
+                  ))}
+                </div>
+                {isTou && systemType === "hybrid" && (
+                  <label className="mt-3 flex items-center gap-2 text-[13px] text-ink/70">
+                    <input type="checkbox" checked={gridCharge} onChange={(e) => setGridCharge(e.target.checked)} />
+                    Sạc thêm pin từ điện lưới giờ thấp điểm, xả giờ cao điểm (khách sản xuất/kinh doanh)
+                  </label>
+                )}
+                <p className="mt-2 text-xs text-ink/45">
+                  Mặc định: inverter 97% mỗi chiều, pin 96% sạc–xả, DoD 90%, tấm pin suy giảm 0,5%/năm, pin lưu trữ 2%/năm. Nhập theo datasheet thiết bị thực tế để chính xác hơn. Sản lượng PV đã nhân hiệu suất inverter DC→AC.
+                </p>
+              </details>
             </div>
           )}
         </section>
@@ -1409,12 +1604,29 @@ export default function SolarCalculator() {
         <section className="mt-8">
           <h2 className="font-display text-lg font-semibold text-navy">Phân tích tài chính</h2>
           <p className="mt-1 text-xs text-ink/45">
-            Tính theo công suất tấm pin THỰC TẾ đã chọn ({round1(actualCapacityKwp)} kWp
-            {systemType !== "off_grid" ? ` · mức bù hoá đơn thực tế ≈ ${effectiveOffsetPercent}%` : ""}) — sửa số lượng tấm pin/inverter/pin lưu trữ ở trên sẽ tự cập nhật lại các số liệu bên dưới.
+            Tính theo THIẾT BỊ ĐÃ CHỌN ({round1(actualCapacityKwp)} kWp tấm pin
+            {selectedInverter ? ` · inverter ${selectedInverter.capacityKw} kW × ${inverterCountManual}` : ""}) — khác phần dự toán theo nhu cầu ở trên. Sửa số lượng thiết bị thì các số liệu bên dưới tự cập nhật.
           </p>
-          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <MetricCard label="Sản lượng bù/tháng" value={`${Math.round(monthlyKwh * (systemType === "off_grid" ? 1 : effectiveOffsetPercent / 100))} kWh`} />
+          {energy.inverterLimited && (
+            <p className="mt-2 rounded-lg bg-gold/10 px-3 py-2 text-xs text-ink/70">
+              Inverter đã chọn chỉ nhận tối đa khoảng {energy.maxPvForInverterKwp} kWp tấm pin (tỉ lệ DC/AC {MAX_DC_AC_RATIO}) — phần tấm pin vượt quá không phát thêm điện. Tăng công suất/số lượng inverter hoặc giảm số tấm pin.
+            </p>
+          )}
+          {energy.surplusKwhMonth > 0 && (
+            <p className="mt-2 rounded-lg bg-surface px-3 py-2 text-xs text-ink/60">
+              Hệ thống phát nhiều hơn nhu cầu điện khoảng {energy.surplusKwhMonth} kWh/tháng — phần dư không tính vào tiết kiệm, nên tiết kiệm tối đa bằng hoá đơn hiện tại.
+            </p>
+          )}
+          {energy.coveredPercent < 100 && (
+            <p className="mt-2 rounded-lg bg-surface px-3 py-2 text-xs text-ink/60">
+              Với thiết bị đã chọn, hệ thống mới bù được khoảng {energy.coveredPercent}% nhu cầu điện hiện tại.
+            </p>
+          )}
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <MetricCard label="Sản lượng PV/tháng" value={`${energy.productionKwhMonth} kWh`} />
+            <MetricCard label="Điện bù được/tháng" value={`${energy.coveredKwhMonth} kWh`} />
             <MetricCard label="Tiết kiệm/tháng" value={vnd(savingsPerMonth)} accent="#2F8F5B" />
+            {savingsBatteryPerMonth > 0 && <MetricCard label="Trong đó từ pin lưu trữ" value={vnd(savingsBatteryPerMonth)} accent="#2F8F5B" />}
             <MetricCard label="Tổng đầu tư" value={vnd(totalPayment)} />
             <MetricCard label="Hoàn vốn" value={paybackYears === Infinity ? "—" : `${paybackYears} năm`} accent="#E8A33D" />
           </div>
@@ -1513,7 +1725,7 @@ export default function SolarCalculator() {
             <div className="mt-3 rounded-xl bg-surface p-3.5 text-xs leading-relaxed text-ink/60">
               <div className="mb-1 font-medium text-ink/75">Ghi chú cách đọc</div>
               <ul className="list-disc space-y-1 pl-4">
-                <li>IRR là mức sinh lời mỗi năm của số tiền bỏ vào hệ thống, tính từ tiền đầu tư ban đầu và tiền điện tiết kiệm được trong 25 năm (có tính lạm phát giá điện và suy hao tấm pin ~0,5%/năm).</li>
+                <li>IRR là mức sinh lời mỗi năm của số tiền bỏ vào hệ thống, tính từ tiền đầu tư ban đầu và tiền điện tiết kiệm được trong 25 năm (có tính lạm phát giá điện và tấm pin suy giảm {panelFadePct}%/năm{hasBatteryHybrid ? `, pin lưu trữ suy giảm ${batFadePct}%/năm` : ""}).</li>
                 <li>Lãi vay NH là chi phí đi vay; lãi gửi tiết kiệm là mức sinh lời nếu để tiền trong ngân hàng.</li>
                 <li>IRR cao hơn lãi vay → &quot;Tốt hơn vay NH&quot;: vay tiền để lắp hệ thống vẫn có lời, vì tiền điện tiết kiệm được lớn hơn tiền lãi phải trả.</li>
                 <li>IRR thấp hơn lãi vay nhưng cao hơn lãi gửi → &quot;Tốt hơn gửi tiết kiệm&quot;. IRR thấp hơn cả hai → &quot;Cân nhắc lại&quot;.</li>
@@ -1557,6 +1769,9 @@ export default function SolarCalculator() {
                 </tbody>
               </table>
             </div>
+            <p className="border-t border-line/70 px-5 py-3 text-xs text-ink/50">
+              Tiết kiệm mỗi năm đã trừ suy giảm: tấm pin {panelFadePct}%/năm{hasBatteryHybrid ? `, pin lưu trữ ${batFadePct}%/năm` : ""}, cộng giá điện tăng {inflationPercent}%/năm.
+            </p>
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
