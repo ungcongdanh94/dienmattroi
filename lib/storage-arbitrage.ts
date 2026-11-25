@@ -199,3 +199,100 @@ export function projectStorage(
   const totalSavingsHorizonVnd = years.length ? years[years.length - 1].cumulativeVnd : 0;
   return { years, paybackYears: payback, totalSavingsHorizonVnd };
 }
+
+export interface StorageSuggestionInput {
+  peakLoadKwhPerDay: number;
+  /** Dung lượng 1 module pin đang chọn (kWh) */
+  batteryModuleKwh: number;
+  /** Công suất 1 inverter đang chọn (kW) */
+  inverterModelKw: number;
+  params: Omit<StorageParams, "maxChargeDcKw" | "maxDischargeDcKw">;
+  /** null = tự động theo 0,5C của cụm pin gợi ý */
+  maxChargeDcKw: number | null;
+  maxDischargeDcKw: number | null;
+}
+
+export interface StorageSuggestion {
+  batteryQty: number;
+  inverterQty: number;
+  batteryNominalKwh: number;
+  usableKwh: number;
+  /** Điện AC xả ra khi xả hết pin (kWh) */
+  dischargeAcKwh: number;
+  /** Công suất AC inverter tối thiểu để sạc đầy trong giờ thấp điểm / xả hết trong giờ cao điểm (kW) */
+  requiredChargeAcKw: number;
+  requiredDischargeAcKw: number;
+  requiredInverterKw: number;
+  /** Công suất DC cần để sạc đầy / xả hết (kW) */
+  requiredChargeDcKw: number;
+  requiredDischargeDcKw: number;
+  /** Mức sạc/xả DC tối đa của cụm pin gợi ý (đã tính nếu để tự động) */
+  maxChargeDcKw: number;
+  maxDischargeDcKw: number;
+  /** Mức DC tối đa đang thấp hơn mức cần để sạc đầy / xả hết */
+  chargeDcTooLow: boolean;
+  dischargeDcTooLow: boolean;
+  /** Số pin cần để sau `years` năm suy giảm vẫn bù đủ tải */
+  batteryQtyAfterFade: number;
+  years: number;
+}
+
+/**
+ * Gợi ý số pin + số inverter để: bù hết điện giờ cao điểm của khách, sạc ĐẦY pin trong 6 giờ thấp điểm
+ * và xả HẾT pin trong 5 giờ cao điểm.
+ */
+export function suggestStorageConfig(i: StorageSuggestionInput, years = 10): StorageSuggestion | null {
+  const kwh = i.batteryModuleKwh;
+  const invKw = i.inverterModelKw;
+  const load = Math.max(0, i.peakLoadKwhPerDay);
+  if (!(kwh > 0) || !(invKw > 0) || !(load > 0)) return null;
+  const p = i.params;
+  const eAc = clamp01(p.acToDcEff);
+  const eDc = clamp01(p.dcToAcEff);
+  const eSide = Math.sqrt(clamp01(p.batteryRoundTripEff));
+  const dod = clamp01(p.dod);
+  const chargeH = TOU_SCHEDULE.offPeakHoursPerDay;
+  const dischargeH = TOU_SCHEDULE.peakHoursPerDay;
+
+  const perModuleAc = kwh * dod * eSide * eDc; // điện AC xả được từ 1 module
+  const batteryQty = Math.max(1, Math.ceil(load / perModuleAc - 1e-9));
+  const nominal = batteryQty * kwh;
+  const usable = nominal * dod;
+  const dischargeAcKwh = usable * eSide * eDc;
+
+  // Sạc đầy trong giờ thấp điểm: điện nạp vào pin (usable) / giờ
+  const requiredChargeDcKw = usable / eSide / chargeH;
+  const requiredChargeAcKw = requiredChargeDcKw / eAc;
+  // Xả hết trong giờ cao điểm
+  const requiredDischargeDcKw = (usable * eSide) / dischargeH;
+  const requiredDischargeAcKw = (requiredDischargeDcKw * eDc);
+  const requiredInverterKw = Math.max(requiredChargeAcKw, requiredDischargeAcKw);
+  const inverterQty = Math.max(1, Math.ceil(requiredInverterKw / invKw - 1e-9));
+
+  const autoDc = nominal * DEFAULT_C_RATE;
+  const maxChargeDcKw = i.maxChargeDcKw ?? autoDc;
+  const maxDischargeDcKw = i.maxDischargeDcKw ?? autoDc;
+
+  const fade = Math.min(0.5, Math.max(0, p.annualFadePercent / 100));
+  const retention = Math.pow(1 - fade, Math.max(0, years - 1));
+  const batteryQtyAfterFade = Math.max(batteryQty, Math.ceil(load / (perModuleAc * retention) - 1e-9));
+
+  return {
+    batteryQty,
+    inverterQty,
+    batteryNominalKwh: nominal,
+    usableKwh: usable,
+    dischargeAcKwh,
+    requiredChargeAcKw,
+    requiredDischargeAcKw,
+    requiredInverterKw,
+    requiredChargeDcKw,
+    requiredDischargeDcKw,
+    maxChargeDcKw,
+    maxDischargeDcKw,
+    chargeDcTooLow: maxChargeDcKw + 1e-9 < requiredChargeDcKw,
+    dischargeDcTooLow: maxDischargeDcKw + 1e-9 < requiredDischargeDcKw,
+    batteryQtyAfterFade,
+    years,
+  };
+}
