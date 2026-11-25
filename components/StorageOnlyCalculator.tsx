@@ -7,6 +7,7 @@ import {
   calculateStorageArbitrage,
   projectStorage,
   suggestStorageConfig,
+  currentAmps,
   DEFAULT_C_RATE,
   DEFAULT_STORAGE_PARAMS,
   type StorageLimit,
@@ -91,6 +92,7 @@ export default function StorageOnlyCalculator({
   const [group, setGroup] = useState<"kinh_doanh" | "san_xuat">("kinh_doanh");
   const [voltageIndex, setVoltageIndex] = useState(0);
   const [peakLoadKwhPerDay, setPeakLoadKwhPerDay] = useState(60);
+  const [peakLoadKw, setPeakLoadKw] = useState(0);
   const [invBrand, setInvBrand] = useState("");
   const [invId, setInvId] = useState("");
   const [invQty, setInvQty] = useState(1);
@@ -173,9 +175,16 @@ export default function StorageOnlyCalculator({
         params: { acToDcEff: params.acToDcEff, dcToAcEff: params.dcToAcEff, batteryRoundTripEff: params.batteryRoundTripEff, dod: params.dod, annualFadePercent: params.annualFadePercent },
         maxChargeDcKw: chargeAuto ? null : maxChargeManualKw,
         maxDischargeDcKw: dischargeAuto ? null : maxDischargeManualKw,
+        peakLoadKw,
       }),
-    [peakLoadKwhPerDay, battery, inverter, params, chargeAuto, dischargeAuto, maxChargeManualKw, maxDischargeManualKw],
+    [peakLoadKwhPerDay, peakLoadKw, battery, inverter, params, chargeAuto, dischargeAuto, maxChargeManualKw, maxDischargeManualKw],
   );
+
+  // Công suất AC thực tế pin + inverter cấp được cùng lúc, so với tải đỉnh khách nhập
+  const acCapKw = Math.min(inverterKw, maxDischargeDcKw * params.dcToAcEff);
+  const threePhase = inverter ? inverter.phase !== "1_pha" : true;
+  const overload = peakLoadKw > 0 && acCapKw > 0 && peakLoadKw > acCapKw + 1e-9;
+  const coverage = overload ? acCapKw / peakLoadKw : 1;
 
   // ----- Báo giá -----
   const items: QuoteItem[] = useMemo(() => {
@@ -217,7 +226,8 @@ export default function StorageOnlyCalculator({
   const ecoNote =
     `Mua điện giờ thấp điểm (${tou ? vnd(tou.offPeak) : "-"}/kWh) để sạc pin, xả bù tải giờ cao điểm (${tou ? vnd(tou.peak) : "-"}/kWh), chưa VAT. ` +
     `Tính ${calc.dischargeKwhPerDay.toFixed(1)} kWh xả/ngày × ${TOU_SCHEDULE.peakDaysPerYear} ngày/năm (thứ Hai–thứ Bảy; Chủ nhật không có giờ cao điểm), giá đã gồm VAT 8%, hiệu suất cả chuỗi AC→DC→pin→AC ≈ ${effPct}%. ` +
-    `Dung lượng pin suy giảm ${fadePctPerYear}%/năm nên tiết kiệm giảm dần; tổng tiết kiệm 10 năm ước tính ${vnd(projection.totalSavingsHorizonVnd)}, hoàn vốn tính theo từng năm.`;
+    `Dung lượng pin suy giảm ${fadePctPerYear}%/năm nên tiết kiệm giảm dần; tổng tiết kiệm 10 năm ước tính ${vnd(projection.totalSavingsHorizonVnd)}, hoàn vốn tính theo từng năm.` +
+    (peakLoadKw > 0 ? ` Tải đỉnh khách ≈ ${num1(peakLoadKw)} kW; hệ thống cấp tối đa ≈ ${num1(acCapKw)} kW cùng lúc.` : "");
 
   function buildExportData(): QuoteExportData | null {
     if (!battery || !inverter) return null;
@@ -381,6 +391,24 @@ export default function StorageOnlyCalculator({
           {peakWarn && <p className="mt-1 text-xs text-red-600">Nhập điện dùng giờ cao điểm lớn hơn 0 để tính tiết kiệm.</p>}
         </div>
 
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-ink">Tải đỉnh giờ cao điểm (kW) — nhập theo thiết bị thực tế của khách</label>
+          <NumInput min={0} step={1} value={peakLoadKw} onChange={(v) => setPeakLoadKw(Math.max(0, v))} className={numCls} />
+          <p className="mt-1.5 text-xs text-ink/50">
+            Tổng công suất các thiết bị chạy cùng lúc (ví dụ nhiều máy lạnh, máy nén, động cơ). Để 0 nếu chưa biết. Thiết bị có động cơ (máy lạnh thường, bơm) kéo dòng khởi động gấp nhiều lần — nên chọn inverter có dư.
+          </p>
+          {peakLoadKw > 0 && inverter && (
+            <div className="mt-2 text-[13px] text-ink/65">
+              Tải đỉnh ≈ {num1(peakLoadKw)} kW ≈ <strong>{num1(currentAmps(peakLoadKw, threePhase))} A</strong> · Hệ thống cấp tối đa ≈ {num1(acCapKw)} kW ≈ <strong>{num1(currentAmps(acCapKw, threePhase))} A</strong> ({threePhase ? "3 pha 380V" : "1 pha 220V"}, hệ số công suất 0,9).
+            </div>
+          )}
+          {overload && (
+            <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-3 text-[13px] text-red-700">
+              Tải đỉnh ({num1(peakLoadKw)} kW) lớn hơn công suất cấp tối đa ({num1(acCapKw)} kW). Phần vượt phải lấy từ lưới ở giá cao điểm (hoặc inverter có thể ngắt nếu cấp điện riêng cho nhánh tải). Nếu tải đỉnh kéo dài suốt giờ cao điểm, pin chỉ bù được khoảng {Math.round(coverage * 100)}% → tiết kiệm có thể chỉ ≈ {vnd(calc.savingsPerYearVnd * coverage)}/năm thay vì {vnd(calc.savingsPerYearVnd)}/năm. Tăng số inverter hoặc mức xả DC tối đa.
+            </div>
+          )}
+        </div>
+
         <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
           <div className="space-y-3 rounded-xl bg-surface p-4">
             <div className="text-sm font-semibold text-navy">Inverter / bộ chuyển đổi (hybrid)</div>
@@ -493,6 +521,11 @@ export default function StorageOnlyCalculator({
               <li>
                 Xả hết trong {TOU_SCHEDULE.peakHoursPerDay} giờ cao điểm cần inverter ≥ {num1(suggestion.requiredDischargeAcKw)} kW (AC) · xả DC ≥ {num1(suggestion.requiredDischargeDcKw)} kW.
               </li>
+              {suggestion.requiredByPeakLoadKw > 0 && (
+                <li>
+                  Tải đỉnh {num1(suggestion.requiredByPeakLoadKw)} kW cần inverter ≥ {num1(suggestion.requiredByPeakLoadKw)} kW (chưa tính dòng khởi động của máy lạnh/động cơ).
+                </li>
+              )}
               {suggestion.batteryQtyAfterFade > suggestion.batteryQty && (
                 <li>
                   Pin suy giảm {fadePctPerYear}%/năm: để sau {suggestion.years} năm vẫn bù đủ tải cần {suggestion.batteryQtyAfterFade} pin ({num1(suggestion.batteryQtyAfterFade * (battery?.moduleKwh ?? 0))} kWh) — đầu tư thêm {suggestion.batteryQtyAfterFade - suggestion.batteryQty} pin.
